@@ -13,6 +13,7 @@ interface ChatRequestBody {
     model: string;
     ollamaUrl?: string;
     transpilerEnabled?: boolean;
+    oauthToken?: string;
   };
   pineVersion?: "v5" | "v6";
   currentCode?: string;
@@ -105,8 +106,9 @@ async function streamAnthropic(
   apiKey: string,
   model: string,
   signal: AbortSignal,
+  oauthToken?: string,
 ) {
-  const client = new Anthropic({ apiKey });
+  const client = oauthToken ? new Anthropic({ authToken: oauthToken }) : new Anthropic({ apiKey });
 
   const stream = client.messages.stream(
     {
@@ -163,10 +165,11 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Missing messages or settings" }, { status: 400 });
   }
 
-  const { provider, apiKey, model, ollamaUrl } = settings;
+  const { provider, apiKey, model, ollamaUrl, oauthToken } = settings;
 
-  if (provider !== "ollama" && !apiKey) {
-    return Response.json({ error: "API key is required" }, { status: 401 });
+  const hasAuth = provider === "ollama" || !!apiKey || !!oauthToken;
+  if (!hasAuth) {
+    return Response.json({ error: "API key or OAuth token is required" }, { status: 401 });
   }
 
   if (!model) {
@@ -238,7 +241,7 @@ export async function POST(req: NextRequest) {
       try {
         // Phase 1: Stream the generation
         if (provider === "anthropic") {
-          const anthropicStream = await streamAnthropic(messages, systemPrompt, apiKey, model, signal);
+          const anthropicStream = await streamAnthropic(messages, systemPrompt, apiKey, model, signal, oauthToken);
 
           for await (const event of anthropicStream) {
             if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
@@ -294,6 +297,7 @@ export async function POST(req: NextRequest) {
                 apiKey,
                 model,
                 ollamaUrl,
+                oauthToken,
               );
 
               if (reviewResult.verdict === "needs_fix" && reviewResult.issues.length > 0) {
@@ -306,6 +310,7 @@ export async function POST(req: NextRequest) {
                   apiKey,
                   model,
                   ollamaUrl,
+                  oauthToken,
                 );
 
                 if (fixedCode) {

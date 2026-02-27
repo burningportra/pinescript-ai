@@ -12,6 +12,7 @@ interface FixRequestBody {
     model: string;
     ollamaUrl?: string;
     transpilerEnabled?: boolean;
+    oauthToken?: string;
   };
   pineVersion: "v5" | "v6";
 }
@@ -30,9 +31,10 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const { provider, apiKey, model, ollamaUrl } = settings;
+  const { provider, apiKey, model, ollamaUrl, oauthToken } = settings;
 
-  if (provider !== "ollama" && !apiKey) {
+  const hasAuth = provider === "ollama" || !!apiKey || !!oauthToken;
+  if (!hasAuth) {
     return Response.json({ error: "API key is required" }, { status: 401 });
   }
 
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
   }));
 
   try {
-    const fixedCode = await fixCode(code, issues, provider, apiKey, model, ollamaUrl);
+    const fixedCode = await fixCode(code, issues, provider, apiKey, model, ollamaUrl, oauthToken);
 
     if (!fixedCode) {
       return Response.json({ error: "Failed to generate fix" }, { status: 500 });

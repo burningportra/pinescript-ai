@@ -1,23 +1,126 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, XCircle, Wrench, Sparkles } from "lucide-react";
-import type { ValidationResult } from "@/lib/types";
+import {
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Wrench,
+  Sparkles,
+  ShieldCheck,
+  BrainCircuit,
+  FileCode2,
+  LoaderCircle,
+} from "lucide-react";
+import type { ValidationResult, StreamStatus } from "@/lib/types";
 
 interface ValidationPanelProps {
   results: ValidationResult[];
   correctedCode: string | null;
-  isValidating: boolean;
+  streamStatus?: StreamStatus;
   onFix?: () => void;
+}
+
+type StepState = "pending" | "active" | "done" | "skipped";
+
+interface PipelineStep {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  state: StepState;
+}
+
+function getPipelineSteps(status: StreamStatus): PipelineStep[] {
+  const order: StreamStatus[] = ["validating", "transpiling", "reviewing", "correcting"];
+  const currentIdx = order.indexOf(status);
+
+  function stepState(stepIdx: number): StepState {
+    if (currentIdx < 0) return "pending";
+    if (stepIdx < currentIdx) return "done";
+    if (stepIdx === currentIdx) return "active";
+    return "pending";
+  }
+
+  return [
+    { id: "validating", label: "Static checks", icon: <ShieldCheck size={14} />, state: stepState(0) },
+    { id: "transpiling", label: "Transpiler", icon: <FileCode2 size={14} />, state: stepState(1) },
+    { id: "reviewing", label: "AI review", icon: <BrainCircuit size={14} />, state: stepState(2) },
+    { id: "correcting", label: "Auto-fix", icon: <Wrench size={14} />, state: stepState(3) },
+  ];
+}
+
+function PipelineStepper({ status }: { status: StreamStatus }) {
+  const steps = getPipelineSteps(status);
+
+  return (
+    <div className="px-4 py-3 space-y-1.5">
+      {steps.map((step) => (
+        <div key={step.id} className="flex items-center gap-2.5">
+          {/* Icon */}
+          <div
+            className={`shrink-0 transition-colors ${
+              step.state === "active"
+                ? "text-primary"
+                : step.state === "done"
+                  ? "text-emerald-400"
+                  : "text-text-dim/40"
+            }`}
+          >
+            {step.state === "active" ? (
+              <LoaderCircle size={14} className="animate-spin" />
+            ) : step.state === "done" ? (
+              <CheckCircle2 size={14} />
+            ) : (
+              step.icon
+            )}
+          </div>
+
+          {/* Label */}
+          <span
+            className={`text-xs transition-colors ${
+              step.state === "active"
+                ? "text-text font-medium"
+                : step.state === "done"
+                  ? "text-text-secondary"
+                  : "text-text-dim/40"
+            }`}
+          >
+            {step.label}
+          </span>
+
+          {/* Active indicator */}
+          {step.state === "active" && (
+            <span className="ml-auto inline-flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="w-1 h-1 rounded-full bg-primary"
+                  style={{ animation: `streaming-dot 1.4s ease-in-out ${i * 0.2}s infinite` }}
+                />
+              ))}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function ValidationPanel({
   results,
   correctedCode,
-  isValidating,
+  streamStatus,
   onFix,
 }: ValidationPanelProps) {
   const [expanded, setExpanded] = useState(true);
+
+  const isValidating =
+    streamStatus === "validating" ||
+    streamStatus === "transpiling" ||
+    streamStatus === "reviewing" ||
+    streamStatus === "correcting";
 
   if (results.length === 0 && !isValidating) return null;
 
@@ -39,16 +142,8 @@ export default function ValidationPanel({
 
         {isValidating ? (
           <span className="flex items-center gap-2 ml-auto">
-            <span className="inline-flex gap-0.5">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="w-1 h-1 rounded-full bg-text-secondary"
-                  style={{ animation: `streaming-dot 1.4s ease-in-out ${i * 0.2}s infinite` }}
-                />
-              ))}
-            </span>
-            <span className="text-text-dim">Checking...</span>
+            <LoaderCircle size={12} className="animate-spin text-primary" />
+            <span className="text-primary font-medium">Running pipeline</span>
           </span>
         ) : (
           <div className="flex items-center gap-2 ml-auto">
@@ -79,6 +174,11 @@ export default function ValidationPanel({
           </div>
         )}
       </button>
+
+      {/* Pipeline stepper — shown while validating */}
+      {expanded && isValidating && streamStatus && (
+        <PipelineStepper status={streamStatus} />
+      )}
 
       {/* Results */}
       {expanded && !isValidating && nonPassResults.length > 0 && (

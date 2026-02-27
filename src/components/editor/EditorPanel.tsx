@@ -182,7 +182,7 @@ export default function EditorPanel({
       <ValidationPanel
         results={validationResults}
         correctedCode={correctedCode}
-        isValidating={streamStatus === "validating" || streamStatus === "reviewing" || streamStatus === "correcting"}
+        streamStatus={streamStatus}
         onFix={onFix}
       />
     </div>

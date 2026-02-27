@@ -3,8 +3,10 @@
 import { useState, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Code2, ChevronDown, ChevronUp } from "lucide-react";
 import type { Message } from "@/lib/types";
+
+const PINE_LANGUAGES = new Set(["pine", "pinescript"]);
 
 function CodeBlock({
   children,
@@ -14,6 +16,7 @@ function CodeBlock({
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const text = String(children).replace(/\n$/, "");
   const lang = className?.replace("language-", "") || "";
 
@@ -29,6 +32,47 @@ function CodeBlock({
       <code className="px-1.5 py-0.5 bg-surface rounded text-xs font-mono text-text-secondary">
         {children}
       </code>
+    );
+  }
+
+  // Pine code: collapsed by default since it's already in the editor
+  if (PINE_LANGUAGES.has(lang)) {
+    const lineCount = text.split("\n").length;
+
+    return (
+      <div className="my-3 rounded-lg overflow-hidden border border-border">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center gap-2 px-3 py-2 bg-surface hover:bg-surface-elevated transition-colors"
+        >
+          <Code2 size={14} className="text-primary shrink-0" />
+          <span className="text-xs text-text-secondary">
+            PineScript code in editor
+          </span>
+          <span className="text-xs text-text-muted">
+            · {lineCount} lines
+          </span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); copy(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); copy(); } }}
+              className="text-text-muted hover:text-text transition-colors"
+            >
+              {copied ? <Check size={13} className="text-accent-success" /> : <Copy size={13} />}
+            </span>
+            {expanded ? <ChevronUp size={14} className="text-text-muted" /> : <ChevronDown size={14} className="text-text-muted" />}
+          </div>
+        </button>
+        {expanded && (
+          <pre className="p-3 overflow-x-auto bg-code-background border-t border-border">
+            <code className="text-xs font-mono text-text leading-relaxed">
+              {text}
+            </code>
+          </pre>
+        )}
+      </div>
     );
   }
 

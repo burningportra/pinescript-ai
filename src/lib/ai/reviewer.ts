@@ -45,10 +45,12 @@ async function callLLM(
   oauthToken?: string,
 ): Promise<string> {
   if (provider === "anthropic") {
-    const client =
-      oauthToken
-        ? new Anthropic({ authToken: oauthToken })
-        : new Anthropic({ apiKey });
+    const client = oauthToken
+      ? new Anthropic({
+          authToken: oauthToken,
+          defaultHeaders: { "anthropic-beta": "oauth-2025-04-20" },
+        })
+      : new Anthropic({ apiKey });
     const response = await client.messages.create({
       model,
       max_tokens: 2048,

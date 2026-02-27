@@ -108,7 +108,12 @@ async function streamAnthropic(
   signal: AbortSignal,
   oauthToken?: string,
 ) {
-  const client = oauthToken ? new Anthropic({ authToken: oauthToken }) : new Anthropic({ apiKey });
+  const client = oauthToken
+    ? new Anthropic({
+        authToken: oauthToken,
+        defaultHeaders: { "anthropic-beta": "oauth-2025-04-20" },
+      })
+    : new Anthropic({ apiKey });
 
   const stream = client.messages.stream(
     {
@@ -180,7 +185,12 @@ export async function POST(req: NextRequest) {
   if (test) {
     try {
       if (provider === "anthropic") {
-        const client = new Anthropic({ apiKey });
+        const client = oauthToken
+          ? new Anthropic({
+              authToken: oauthToken,
+              defaultHeaders: { "anthropic-beta": "oauth-2025-04-20" },
+            })
+          : new Anthropic({ apiKey });
         await client.messages.create({
           model,
           max_tokens: 10,

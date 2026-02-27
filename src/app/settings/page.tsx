@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Eye, EyeOff, Loader2, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import {
   type Settings,
@@ -17,56 +17,27 @@ type TestStatus = "idle" | "testing" | "success" | "error";
 
 function SettingsContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [showKey, setShowKey] = useState(false);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testMessage, setTestMessage] = useState("");
   const [loaded, setLoaded] = useState(false);
-  const [oauthStatus, setOauthStatus] = useState<{
-    type: "success" | "error";
-    message?: string;
-  } | null>(null);
+  const [oauthStep, setOauthStep] = useState<
+    "idle" | "waiting" | "exchanging"
+  >("idle");
+  const [oauthCode, setOauthCode] = useState("");
+  const [oauthError, setOauthError] = useState("");
 
   useEffect(() => {
-    // Consume OAuth cookie and move to localStorage
-    const cookieName = "anthropic_oauth_pending_token";
-    const cookies = document.cookie.split(";").map((c) => c.trim());
-    const oauthCookie = cookies.find((c) => c.startsWith(`${cookieName}=`));
-    let oauthToken: string | undefined;
-
-    if (oauthCookie) {
-      oauthToken = decodeURIComponent(oauthCookie.slice(cookieName.length + 1));
-      // Delete the cookie by setting it expired
-      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-    }
-
-    // Read from localStorage and merge with OAuth token if present
     const stored = localStorage.getItem(STORAGE_KEY);
     try {
       const parsed = stored ? JSON.parse(stored) : {};
-      const merged: Settings = { ...DEFAULT_SETTINGS, ...parsed };
-      if (oauthToken) {
-        merged.oauthToken = oauthToken;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-      }
-      setSettings(merged);
+      setSettings({ ...DEFAULT_SETTINGS, ...parsed });
     } catch {
       // ignore
     }
-
     setLoaded(true);
   }, []);
-
-  useEffect(() => {
-    const oauth = searchParams.get("oauth");
-    const message = searchParams.get("message");
-    if (oauth === "success") {
-      setOauthStatus({ type: "success" });
-    } else if (oauth === "error") {
-      setOauthStatus({ type: "error", message: message ?? "OAuth failed" });
-    }
-  }, [searchParams]);
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((prev) => {
@@ -97,7 +68,48 @@ function SettingsContent() {
         // ignore
       }
     }
+    setOauthStep("idle");
+    setOauthCode("");
+    setOauthError("");
     setTestStatus("idle");
+  }
+
+  function onOAuthLinkClick() {
+    setOauthError("");
+    setOauthStep("waiting");
+  }
+
+  async function exchangeOAuthCode() {
+    if (!oauthCode.trim()) return;
+    setOauthStep("exchanging");
+    setOauthError("");
+    try {
+      const res = await fetch("/api/auth/anthropic/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: oauthCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const detail = data.detail ? JSON.stringify(data.detail) : "";
+        setOauthError(`${data.error || "Token exchange failed"}${detail ? ` — ${detail}` : ""}`);
+        setOauthStep("waiting");
+        return;
+      }
+      setSettings((prev) => ({ ...prev, oauthToken: data.accessToken }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"),
+          oauthToken: data.accessToken,
+        })
+      );
+      setOauthStep("idle");
+      setOauthCode("");
+    } catch {
+      setOauthError("Exchange failed. Try again.");
+      setOauthStep("waiting");
+    }
   }
 
   async function testConnection() {
@@ -160,18 +172,10 @@ function SettingsContent() {
             Configure your AI provider and PineScript preferences.
           </p>
 
-          {/* OAuth Status Banner */}
-          {oauthStatus && (
-            <div
-              className={`mb-6 px-4 py-3 rounded-lg text-sm border ${
-                oauthStatus.type === "success"
-                  ? "bg-accent-success/10 border-accent-success/20 text-accent-success"
-                  : "bg-accent-error/10 border-accent-error/20 text-accent-error"
-              }`}
-            >
-              {oauthStatus.type === "success"
-                ? "Successfully connected to Claude."
-                : `OAuth error: ${oauthStatus.message}`}
+          {/* OAuth Error Banner */}
+          {oauthError && (
+            <div className="mb-6 px-4 py-3 rounded-lg text-sm border bg-accent-error/10 border-accent-error/20 text-accent-error">
+              {oauthError}
             </div>
           )}
 
@@ -218,6 +222,10 @@ function SettingsContent() {
                 placeholder="http://localhost:11434"
                 className="w-full px-3 py-2.5 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-border-subtle transition-colors font-mono"
               />
+            ) : settings.provider === "anthropic" && settings.oauthToken ? (
+              <div className="px-3 py-2.5 bg-surface border border-border rounded-lg text-sm text-text-muted">
+                Not needed — using Claude OAuth
+              </div>
             ) : (
               <div className="relative">
                 <input
@@ -256,8 +264,8 @@ function SettingsContent() {
                 </span>
               </div>
               <p className="text-xs text-text-dim mb-3">
-                Uses the same internal endpoint as Claude Code CLI. Not
-                officially supported by Anthropic. May break without notice.
+                Sign in with your Claude account. After authorizing, copy the
+                code and paste it below.
               </p>
               {settings.oauthToken ? (
                 <div className="flex items-center gap-3">
@@ -273,12 +281,46 @@ function SettingsContent() {
                   </button>
                 </div>
               ) : (
-                <a
-                  href="/api/auth/anthropic"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-border bg-surface text-text-dim hover:text-text-secondary hover:border-border-subtle transition-colors"
-                >
-                  Connect with Claude
-                </a>
+                <div className="space-y-3">
+                  <a
+                    href="/api/auth/anthropic"
+                    target="_blank"
+                    rel="noopener"
+                    onClick={onOAuthLinkClick}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-border bg-surface text-text-dim hover:text-text-secondary hover:border-border-subtle transition-colors"
+                  >
+                    <ExternalLink size={14} />
+                    Authorize with Claude
+                  </a>
+                  {oauthStep !== "idle" && (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={oauthCode}
+                        onChange={(e) => setOauthCode(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && exchangeOAuthCode()
+                        }
+                        placeholder="Paste authorization code"
+                        className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-border-subtle transition-colors font-mono"
+                        disabled={oauthStep === "exchanging"}
+                        autoFocus
+                      />
+                      <button
+                        onClick={exchangeOAuthCode}
+                        disabled={
+                          !oauthCode.trim() || oauthStep === "exchanging"
+                        }
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-background hover:bg-text-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {oauthStep === "exchanging" && (
+                          <Loader2 size={14} className="animate-spin" />
+                        )}
+                        Connect
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -404,9 +446,5 @@ function SettingsContent() {
 }
 
 export default function SettingsPage() {
-  return (
-    <Suspense fallback={null}>
-      <SettingsContent />
-    </Suspense>
-  );
+  return <SettingsContent />;
 }

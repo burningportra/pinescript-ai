@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, CheckCircle, ExternalLink, Loader2 } from "lucide-react";
 import {
   type Provider,
   DEFAULT_SETTINGS,
@@ -20,27 +20,16 @@ export default function OnboardingGate({ onComplete }: OnboardingGateProps) {
   const [model, setModel] = useState(PROVIDER_MODELS.anthropic[0]);
   const [showKey, setShowKey] = useState(false);
   const [oauthToken, setOauthToken] = useState("");
+  const [oauthStep, setOauthStep] = useState<"idle" | "waiting" | "exchanging">("idle");
+  const [oauthCode, setOauthCode] = useState("");
+  const [oauthError, setOauthError] = useState("");
 
   useEffect(() => {
-    // Consume anthropic_oauth_pending_token cookie if present
-    const cookieName = "anthropic_oauth_pending_token";
-    const oauthCookie = document.cookie
-      .split(";")
-      .map((c) => c.trim())
-      .find((c) => c.startsWith(`${cookieName}=`));
-
-    let token = "";
-    if (oauthCookie) {
-      token = decodeURIComponent(oauthCookie.slice(cookieName.length + 1));
-      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-    }
-
-    // Also load any previously saved oauthToken from localStorage
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (!token && parsed.oauthToken) token = parsed.oauthToken;
+        if (parsed.oauthToken) setOauthToken(parsed.oauthToken);
         if (parsed.provider) setProvider(parsed.provider);
         if (parsed.apiKey) setApiKey(parsed.apiKey);
         if (parsed.ollamaUrl) setOllamaUrl(parsed.ollamaUrl);
@@ -49,8 +38,6 @@ export default function OnboardingGate({ onComplete }: OnboardingGateProps) {
         // ignore
       }
     }
-
-    if (token) setOauthToken(token);
   }, []);
 
   function selectProvider(p: Provider) {
@@ -60,6 +47,9 @@ export default function OnboardingGate({ onComplete }: OnboardingGateProps) {
 
   function disconnectOAuth() {
     setOauthToken("");
+    setOauthStep("idle");
+    setOauthCode("");
+    setOauthError("");
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
@@ -69,6 +59,36 @@ export default function OnboardingGate({ onComplete }: OnboardingGateProps) {
       } catch {
         // ignore
       }
+    }
+  }
+
+  function onOAuthLinkClick() {
+    setOauthError("");
+    setOauthStep("waiting");
+  }
+
+  async function exchangeOAuthCode() {
+    if (!oauthCode.trim()) return;
+    setOauthStep("exchanging");
+    setOauthError("");
+    try {
+      const res = await fetch("/api/auth/anthropic/exchange", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: oauthCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOauthError(data.error || "Token exchange failed");
+        setOauthStep("waiting");
+        return;
+      }
+      setOauthToken(data.accessToken);
+      setOauthStep("idle");
+      setOauthCode("");
+    } catch {
+      setOauthError("Exchange failed. Try again.");
+      setOauthStep("waiting");
     }
   }
 
@@ -135,6 +155,10 @@ export default function OnboardingGate({ onComplete }: OnboardingGateProps) {
               placeholder="http://localhost:11434"
               className="w-full px-3 py-2.5 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-border-subtle transition-colors font-mono"
             />
+          ) : provider === "anthropic" && oauthToken ? (
+            <div className="px-3 py-2.5 bg-surface border border-border rounded-lg text-xs text-text-muted">
+              Not needed — using Claude OAuth
+            </div>
           ) : (
             <div className="relative">
               <input
@@ -166,6 +190,9 @@ export default function OnboardingGate({ onComplete }: OnboardingGateProps) {
                 Experimental
               </span>
             </div>
+            {oauthError && (
+              <p className="text-xs text-accent-error mb-2">{oauthError}</p>
+            )}
             {oauthToken ? (
               <div className="flex items-center gap-2.5">
                 <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-success/10 border border-accent-success/20 text-accent-success text-xs font-medium">
@@ -180,12 +207,42 @@ export default function OnboardingGate({ onComplete }: OnboardingGateProps) {
                 </button>
               </div>
             ) : (
-              <a
-                href="/api/auth/anthropic"
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-border bg-surface text-text-dim hover:text-text-secondary hover:border-border-subtle transition-colors"
-              >
-                Connect with Claude
-              </a>
+              <div className="space-y-2.5">
+                <a
+                  href="/api/auth/anthropic"
+                  target="_blank"
+                  rel="noopener"
+                  onClick={onOAuthLinkClick}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border border-border bg-surface text-text-dim hover:text-text-secondary hover:border-border-subtle transition-colors"
+                >
+                  <ExternalLink size={12} />
+                  Authorize with Claude
+                </a>
+                {oauthStep !== "idle" && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={oauthCode}
+                      onChange={(e) => setOauthCode(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && exchangeOAuthCode()}
+                      placeholder="Paste authorization code"
+                      className="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-border-subtle transition-colors font-mono"
+                      disabled={oauthStep === "exchanging"}
+                      autoFocus
+                    />
+                    <button
+                      onClick={exchangeOAuthCode}
+                      disabled={!oauthCode.trim() || oauthStep === "exchanging"}
+                      className="px-3 py-2 rounded-lg text-xs font-medium bg-white text-background hover:bg-text-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    >
+                      {oauthStep === "exchanging" && (
+                        <Loader2 size={12} className="animate-spin" />
+                      )}
+                      Connect
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

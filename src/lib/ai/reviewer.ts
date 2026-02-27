@@ -42,9 +42,13 @@ async function callLLM(
   apiKey: string,
   model: string,
   ollamaUrl?: string,
+  oauthToken?: string,
 ): Promise<string> {
   if (provider === "anthropic") {
-    const client = new Anthropic({ apiKey });
+    const client =
+      oauthToken
+        ? new Anthropic({ authToken: oauthToken })
+        : new Anthropic({ apiKey });
     const response = await client.messages.create({
       model,
       max_tokens: 2048,
@@ -121,6 +125,7 @@ export async function reviewCode(
   apiKey: string,
   model: string,
   ollamaUrl?: string,
+  oauthToken?: string,
 ): Promise<ReviewResult> {
   try {
     const response = await callLLM(
@@ -130,6 +135,7 @@ export async function reviewCode(
       apiKey,
       model,
       ollamaUrl,
+      oauthToken,
     );
     return parseReviewResponse(response);
   } catch (err) {
@@ -145,6 +151,7 @@ export async function fixCode(
   apiKey: string,
   model: string,
   ollamaUrl?: string,
+  oauthToken?: string,
 ): Promise<string | null> {
   const issueList = issues
     .map(
@@ -163,6 +170,7 @@ export async function fixCode(
       apiKey,
       model,
       ollamaUrl,
+      oauthToken,
     );
     return extractCodeFromResponse(response);
   } catch (err) {

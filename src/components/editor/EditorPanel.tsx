@@ -10,6 +10,7 @@ import { pineScriptLanguage } from "./pine-language";
 import { pineTheme, pineHighlight } from "./codemirror-theme";
 import ValidationPanel from "./ValidationPanel";
 import type { PineVersion, ValidationResult, StreamStatus } from "@/lib/types";
+import { SCRIPTS_KEY } from "@/lib/types";
 
 interface EditorPanelProps {
   code: string;
@@ -100,14 +101,14 @@ export default function EditorPanel({
   }, [code]);
 
   const saveScript = useCallback(() => {
-    const scripts = JSON.parse(localStorage.getItem("pinescript-ai-scripts") || "[]");
+    const scripts = JSON.parse(localStorage.getItem(SCRIPTS_KEY) || "[]");
     scripts.unshift({
       id: Date.now().toString(),
       title: title || "Untitled Script",
       code,
       timestamp: Date.now(),
     });
-    localStorage.setItem("pinescript-ai-scripts", JSON.stringify(scripts));
+    localStorage.setItem(SCRIPTS_KEY, JSON.stringify(scripts));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }, [code, title]);

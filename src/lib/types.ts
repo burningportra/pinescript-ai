@@ -68,6 +68,24 @@ export const PROVIDER_MODELS: Record<Provider, string[]> = {
 };
 
 export const STORAGE_KEY = "pinescript-ai-settings";
+export const SCRIPTS_KEY = "pinescript-ai-scripts";
+export const CHATS_KEY = "pinescript-ai-chats";
+
+export interface SavedScript {
+  id: string;
+  title: string;
+  code: string;
+  timestamp: number;
+}
+
+export interface SavedChat {
+  id: string;
+  title: string;
+  messages: Message[];
+  currentCode: string;
+  codeTitle: string;
+  timestamp: number;
+}
 
 export interface ReviewIssue {
   severity: "error" | "warning" | "info";

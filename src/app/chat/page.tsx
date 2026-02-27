@@ -7,7 +7,7 @@ import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import OnboardingGate from "@/components/chat/OnboardingGate";
 import { useChat } from "@/hooks/useChat";
-import { STORAGE_KEY, type PineVersion } from "@/lib/types";
+import { STORAGE_KEY, type PineVersion, type SavedChat } from "@/lib/types";
 import dynamic from "next/dynamic";
 
 const EditorPanel = dynamic(() => import("@/components/editor/EditorPanel"), {
@@ -47,11 +47,25 @@ export default function ChatPage() {
     correctedCode,
     sendMessage,
     fixCode,
+    loadChat,
+    clearChat,
     clearCode,
     updateCode,
   } = useChat();
 
   const hasCode = currentCode.length > 0;
+
+  const handleLoadScript = useCallback((code: string, title: string) => {
+    updateCode(code);
+  }, [updateCode]);
+
+  const handleLoadChat = useCallback((chat: SavedChat) => {
+    loadChat(chat);
+  }, [loadChat]);
+
+  const handleNewChat = useCallback(() => {
+    clearChat();
+  }, [clearChat]);
 
   const checkSettings = useCallback(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -61,7 +75,7 @@ export default function ChatPage() {
     }
     try {
       const settings = JSON.parse(stored);
-      if (!settings.apiKey && settings.provider !== "ollama") {
+      if (!settings.apiKey && !settings.oauthToken && settings.provider !== "ollama") {
         setHasSettings(false);
         return;
       }
@@ -83,7 +97,11 @@ export default function ChatPage() {
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar />
+      <Sidebar
+        onLoadScript={handleLoadScript}
+        onLoadChat={handleLoadChat}
+        onNewChat={handleNewChat}
+      />
       <main className="ml-[56px] flex-1 flex">
         {/* Chat panel */}
         <div

@@ -1,7 +1,8 @@
 "use client";
 
-import { useReducer, useCallback, useRef } from "react";
-import type { ChatState, Message, StreamStatus, Settings, ValidationResult } from "@/lib/types";
+import { useReducer, useCallback, useRef, useEffect } from "react";
+import type { ChatState, Message, StreamStatus, Settings, ValidationResult, SavedChat } from "@/lib/types";
+import { CHATS_KEY } from "@/lib/types";
 
 // Actions
 type Action =
@@ -12,6 +13,7 @@ type Action =
   | { type: "SET_ERROR"; error: string }
   | { type: "SET_VALIDATION"; results: ValidationResult[]; correctedCode: string | null }
   | { type: "CLEAR_ERROR" }
+  | { type: "LOAD_CHAT"; messages: Message[]; currentCode: string; codeTitle: string }
   | { type: "RESET" };
 
 const initialState: ChatState = {
@@ -55,6 +57,13 @@ function reducer(state: ChatState, action: Action): ChatState {
       };
     case "CLEAR_ERROR":
       return { ...state, error: null, streamStatus: "idle" };
+    case "LOAD_CHAT":
+      return {
+        ...initialState,
+        messages: action.messages,
+        currentCode: action.currentCode,
+        codeTitle: action.codeTitle,
+      };
     case "RESET":
       return initialState;
     default:
@@ -85,6 +94,37 @@ function extractPineCode(content: string): { code: string; title: string } | nul
 export function useChat() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const abortRef = useRef<AbortController | null>(null);
+  const chatIdRef = useRef(generateId());
+
+  // Auto-save chat to localStorage when not streaming and messages exist
+  useEffect(() => {
+    if (state.isStreaming || state.messages.length === 0) return;
+
+    const chats: SavedChat[] = JSON.parse(localStorage.getItem(CHATS_KEY) || "[]");
+    const firstUserMsg = state.messages.find((m) => m.role === "user");
+    const title = firstUserMsg?.content.slice(0, 60) || "New Chat";
+
+    const chatData: SavedChat = {
+      id: chatIdRef.current,
+      title,
+      messages: state.messages,
+      currentCode: state.currentCode,
+      codeTitle: state.codeTitle,
+      timestamp: Date.now(),
+    };
+
+    const existing = chats.findIndex((c) => c.id === chatIdRef.current);
+    if (existing >= 0) {
+      chats[existing] = chatData;
+    } else {
+      chats.unshift(chatData);
+    }
+
+    // Keep max 50 chats
+    if (chats.length > 50) chats.length = 50;
+
+    localStorage.setItem(CHATS_KEY, JSON.stringify(chats));
+  }, [state.messages, state.isStreaming, state.currentCode, state.codeTitle]);
 
   const sendMessage = useCallback(async (content: string) => {
     // Load settings from localStorage
@@ -321,8 +361,20 @@ export function useChat() {
     }
   }, [state.currentCode, state.validationResults, state.codeTitle]);
 
+  const loadChat = useCallback((chat: SavedChat) => {
+    abortRef.current?.abort();
+    chatIdRef.current = chat.id;
+    dispatch({
+      type: "LOAD_CHAT",
+      messages: chat.messages,
+      currentCode: chat.currentCode,
+      codeTitle: chat.codeTitle,
+    });
+  }, []);
+
   const clearChat = useCallback(() => {
     abortRef.current?.abort();
+    chatIdRef.current = generateId();
     dispatch({ type: "RESET" });
   }, []);
 
@@ -339,6 +391,7 @@ export function useChat() {
     ...state,
     sendMessage,
     fixCode,
+    loadChat,
     clearChat,
     clearCode,
     updateCode,

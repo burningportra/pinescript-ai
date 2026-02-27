@@ -6,8 +6,8 @@ import { generateCodeVerifier, generateCodeChallenge, generateState } from "@/li
 // See: https://github.com/anthropics/claude-code (Claude Code PKCE flow)
 const CLAUDE_OAUTH_URL = "https://claude.ai/oauth/authorize";
 
-// Claude Code's public client ID (default fallback). Override via ANTHROPIC_OAUTH_CLIENT_ID.
-const DEFAULT_CLIENT_ID = "9d1c250a-e61b-48f7-b079-c8e9dcb4c6b2";
+// Public client ID (same as craft-agents-oss). Override via ANTHROPIC_OAUTH_CLIENT_ID.
+const DEFAULT_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
 export async function GET() {
   const verifier = generateCodeVerifier();
@@ -22,7 +22,7 @@ export async function GET() {
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: "claude_code:billing openai:* anthropic:*",
+    scope: "org:create_api_key user:profile user:inference",
     code_challenge: challenge,
     code_challenge_method: "S256",
     state,

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// NOTE: This uses the same internal OAuth token endpoint as the Claude Code CLI.
-// Anthropic does not publish a public OAuth API. This is unofficial.
-// See: https://github.com/anthropics/claude-code (Claude Code PKCE flow)
-const CLAUDE_TOKEN_URL = "https://claude.ai/oauth/token";
+// NOTE: Uses the same OAuth token endpoint as craft-agents-oss / Claude Code CLI.
+// See: https://github.com/lukilabs/craft-agents-oss
+const CLAUDE_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token";
 
-const DEFAULT_CLIENT_ID = "9d1c250a-e61b-48f7-b079-c8e9dcb4c6b2";
+const DEFAULT_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 
 function errorRedirect(message: string): NextResponse {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -46,16 +45,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   let tokenResponse: Response;
   try {
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      state: state,
+    });
     tokenResponse = await fetch(CLAUDE_TOKEN_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "authorization_code",
-        code,
-        code_verifier: codeVerifier,
-        redirect_uri: redirectUri,
-        client_id: clientId,
-      }),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
     });
   } catch {
     const response = errorRedirect("network_error");

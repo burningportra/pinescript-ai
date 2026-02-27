@@ -1,5 +1,7 @@
 export type Provider = "anthropic" | "openai" | "google" | "ollama";
 
+export type AnthropicAuthMethod = "api_key" | "oauth";
+
 export type PineVersion = "v5" | "v6";
 
 export interface Settings {
@@ -9,6 +11,7 @@ export interface Settings {
   ollamaUrl: string;
   pineVersion: PineVersion;
   transpilerEnabled?: boolean;
+  oauthToken?: string;
 }
 
 export interface Message {

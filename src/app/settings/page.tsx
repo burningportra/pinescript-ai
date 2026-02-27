@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Loader2, CheckCircle, XCircle } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import {
@@ -15,25 +15,58 @@ import {
 
 type TestStatus = "idle" | "testing" | "success" | "error";
 
-export default function SettingsPage() {
+function SettingsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [showKey, setShowKey] = useState(false);
   const [testStatus, setTestStatus] = useState<TestStatus>("idle");
   const [testMessage, setTestMessage] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [oauthStatus, setOauthStatus] = useState<{
+    type: "success" | "error";
+    message?: string;
+  } | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
-      } catch {
-        // ignore
-      }
+    // Consume OAuth cookie and move to localStorage
+    const cookieName = "anthropic_oauth_pending_token";
+    const cookies = document.cookie.split(";").map((c) => c.trim());
+    const oauthCookie = cookies.find((c) => c.startsWith(`${cookieName}=`));
+    let oauthToken: string | undefined;
+
+    if (oauthCookie) {
+      oauthToken = decodeURIComponent(oauthCookie.slice(cookieName.length + 1));
+      // Delete the cookie by setting it expired
+      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
     }
+
+    // Read from localStorage and merge with OAuth token if present
+    const stored = localStorage.getItem(STORAGE_KEY);
+    try {
+      const parsed = stored ? JSON.parse(stored) : {};
+      const merged: Settings = { ...DEFAULT_SETTINGS, ...parsed };
+      if (oauthToken) {
+        merged.oauthToken = oauthToken;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      }
+      setSettings(merged);
+    } catch {
+      // ignore
+    }
+
     setLoaded(true);
   }, []);
+
+  useEffect(() => {
+    const oauth = searchParams.get("oauth");
+    const message = searchParams.get("message");
+    if (oauth === "success") {
+      setOauthStatus({ type: "success" });
+    } else if (oauth === "error") {
+      setOauthStatus({ type: "error", message: message ?? "OAuth failed" });
+    }
+  }, [searchParams]);
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((prev) => {
@@ -45,6 +78,25 @@ export default function SettingsPage() {
       }
       return next;
     });
+    setTestStatus("idle");
+  }
+
+  function disconnect() {
+    setSettings((prev) => {
+      const next = { ...prev };
+      delete next.oauthToken;
+      return next;
+    });
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        delete parsed.oauthToken;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      } catch {
+        // ignore
+      }
+    }
     setTestStatus("idle");
   }
 
@@ -63,6 +115,7 @@ export default function SettingsPage() {
             apiKey: settings.apiKey,
             model: settings.model,
             ollamaUrl: settings.ollamaUrl,
+            oauthToken: settings.oauthToken,
           },
           test: true,
         }),
@@ -90,7 +143,10 @@ export default function SettingsPage() {
   const canSave =
     settings.provider === "ollama"
       ? settings.ollamaUrl.length > 0 && settings.model.length > 0
-      : settings.apiKey.length > 0 && settings.model.length > 0;
+      : settings.provider === "anthropic"
+        ? (settings.apiKey.length > 0 || !!settings.oauthToken) &&
+          settings.model.length > 0
+        : settings.apiKey.length > 0 && settings.model.length > 0;
 
   if (!loaded) return null;
 
@@ -104,31 +160,48 @@ export default function SettingsPage() {
             Configure your AI provider and PineScript preferences.
           </p>
 
+          {/* OAuth Status Banner */}
+          {oauthStatus && (
+            <div
+              className={`mb-6 px-4 py-3 rounded-lg text-sm border ${
+                oauthStatus.type === "success"
+                  ? "bg-accent-success/10 border-accent-success/20 text-accent-success"
+                  : "bg-accent-error/10 border-accent-error/20 text-accent-error"
+              }`}
+            >
+              {oauthStatus.type === "success"
+                ? "Successfully connected to Claude."
+                : `OAuth error: ${oauthStatus.message}`}
+            </div>
+          )}
+
           {/* Provider */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-text mb-2">
               AI Provider
             </label>
             <div className="flex gap-2">
-              {(["anthropic", "openai", "google", "ollama"] as Provider[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => update("provider", p)}
-                  className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-colors ${
-                    settings.provider === p
-                      ? "border-border-subtle bg-surface-elevated text-white"
-                      : "border-border bg-surface text-text-dim hover:border-border-subtle hover:text-text-secondary"
-                  }`}
-                >
-                  {p === "anthropic"
-                    ? "Anthropic"
-                    : p === "openai"
-                      ? "OpenAI"
-                      : p === "google"
-                        ? "Google"
-                        : "Ollama"}
-                </button>
-              ))}
+              {(["anthropic", "openai", "google", "ollama"] as Provider[]).map(
+                (p) => (
+                  <button
+                    key={p}
+                    onClick={() => update("provider", p)}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                      settings.provider === p
+                        ? "border-border-subtle bg-surface-elevated text-white"
+                        : "border-border bg-surface text-text-dim hover:border-border-subtle hover:text-text-secondary"
+                    }`}
+                  >
+                    {p === "anthropic"
+                      ? "Anthropic"
+                      : p === "openai"
+                        ? "OpenAI"
+                        : p === "google"
+                          ? "Google"
+                          : "Ollama"}
+                  </button>
+                )
+              )}
             </div>
           </div>
 
@@ -170,6 +243,45 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+
+          {/* OAuth Section - Anthropic only */}
+          {settings.provider === "anthropic" && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-text">
+                  Claude OAuth
+                </label>
+                <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  Experimental
+                </span>
+              </div>
+              <p className="text-xs text-text-dim mb-3">
+                Uses the same internal endpoint as Claude Code CLI. Not
+                officially supported by Anthropic. May break without notice.
+              </p>
+              {settings.oauthToken ? (
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent-success/10 border border-accent-success/20 text-accent-success text-sm font-medium">
+                    <CheckCircle size={14} />
+                    Connected
+                  </span>
+                  <button
+                    onClick={disconnect}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium border border-border bg-surface text-text-dim hover:text-text-secondary hover:border-border-subtle transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              ) : (
+                <a
+                  href="/api/auth/anthropic"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium border border-border bg-surface text-text-dim hover:text-text-secondary hover:border-border-subtle transition-colors"
+                >
+                  Connect with Claude
+                </a>
+              )}
+            </div>
+          )}
 
           {/* Model */}
           <div className="mb-6">
@@ -231,16 +343,21 @@ export default function SettingsPage() {
               Transpiler Validation
             </label>
             <button
-              onClick={() => update("transpilerEnabled", !settings.transpilerEnabled)}
+              onClick={() =>
+                update("transpilerEnabled", !settings.transpilerEnabled)
+              }
               className={`w-full py-2.5 px-3 rounded-lg text-sm text-left border transition-colors ${
                 settings.transpilerEnabled
                   ? "border-border-subtle bg-surface-elevated text-white"
                   : "border-border bg-surface text-text-dim hover:border-border-subtle"
               }`}
             >
-              <span className="font-medium">{settings.transpilerEnabled ? "Enabled" : "Disabled"}</span>
+              <span className="font-medium">
+                {settings.transpilerEnabled ? "Enabled" : "Disabled"}
+              </span>
               <span className="block text-xs text-text-dim mt-0.5">
-                Experimental — uses pine-transpiler to catch syntax errors via AST parsing
+                Experimental — uses pine-transpiler to catch syntax errors via
+                AST parsing
               </span>
             </button>
           </div>
@@ -283,5 +400,13 @@ export default function SettingsPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
   );
 }

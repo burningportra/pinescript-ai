@@ -8,10 +8,11 @@ import { reviewCode, fixCode } from "@/lib/ai/reviewer";
 interface ChatRequestBody {
   messages: { role: "user" | "assistant"; content: string }[];
   settings: {
-    provider: "anthropic" | "openai" | "ollama";
+    provider: "anthropic" | "openai" | "google" | "ollama";
     apiKey: string;
     model: string;
     ollamaUrl?: string;
+    transpilerEnabled?: boolean;
   };
   pineVersion?: "v5" | "v6";
   currentCode?: string;
@@ -129,8 +130,8 @@ async function streamOpenAI(
   signal: AbortSignal,
 ) {
   const client = new OpenAI({
-    apiKey: baseURL ? "ollama" : apiKey,
-    ...(baseURL && { baseURL: `${baseURL}/v1` }),
+    apiKey: apiKey || "ollama",
+    ...(baseURL && { baseURL }),
   });
 
   const stream = await client.chat.completions.create(
@@ -189,6 +190,16 @@ export async function POST(req: NextRequest) {
           max_tokens: 10,
           messages: [{ role: "user", content: "Hi" }],
         });
+      } else if (provider === "google") {
+        const client = new OpenAI({
+          apiKey,
+          baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+        });
+        await client.chat.completions.create({
+          model,
+          max_tokens: 10,
+          messages: [{ role: "user", content: "Hi" }],
+        });
       } else if (provider === "ollama") {
         const client = new OpenAI({
           apiKey: "ollama",
@@ -236,7 +247,12 @@ export async function POST(req: NextRequest) {
             }
           }
         } else {
-          const baseURL = provider === "ollama" ? (ollamaUrl || "http://localhost:11434") : undefined;
+          const baseURL =
+            provider === "google"
+              ? "https://generativelanguage.googleapis.com/v1beta/openai/"
+              : provider === "ollama"
+                ? `${ollamaUrl || "http://localhost:11434"}/v1`
+                : undefined;
           const openaiStream = await streamOpenAI(messages, systemPrompt, apiKey, model, baseURL, signal);
 
           for await (const chunk of openaiStream) {
@@ -256,7 +272,17 @@ export async function POST(req: NextRequest) {
           // Step 1: Static validation
           send({ status: "validating" });
           const staticResults = validatePineScript(generatedCode, version);
-          const hasStaticErrors = staticResults.some((r) => r.status === "error");
+
+          // Step 1.5: Transpiler validation (if enabled)
+          let transpilerResults: typeof staticResults = [];
+          if (settings.transpilerEnabled) {
+            send({ status: "transpiling" });
+            const { transpileValidate } = await import("@/lib/transpiler");
+            transpilerResults = transpileValidate(generatedCode);
+          }
+
+          const allStaticResults = [...staticResults, ...transpilerResults];
+          const hasStaticErrors = allStaticResults.some((r) => r.status === "error");
 
           if (!hasStaticErrors) {
             // Step 2: AI review (only if static passes)
@@ -302,7 +328,7 @@ export async function POST(req: NextRequest) {
                 } else {
                   // Fix failed — report issues without correction
                   const allResults = [
-                    ...staticResults,
+                    ...allStaticResults,
                     ...reviewResult.issues.map((issue) => ({
                       rule: "ai-review",
                       status: (issue.severity === "error" ? "error" : "warn") as "error" | "warn",
@@ -315,15 +341,15 @@ export async function POST(req: NextRequest) {
                 }
               } else {
                 // Review passed
-                send({ validation: staticResults });
+                send({ validation: allStaticResults });
               }
             } catch {
               // AI review failed — just send static results (fail open)
-              send({ validation: staticResults });
+              send({ validation: allStaticResults });
             }
           } else {
             // Static validation found errors — skip AI review, report immediately
-            send({ validation: staticResults });
+            send({ validation: allStaticResults });
           }
         }
 

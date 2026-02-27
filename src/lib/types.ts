@@ -1,4 +1,4 @@
-export type Provider = "anthropic" | "openai" | "ollama";
+export type Provider = "anthropic" | "openai" | "google" | "ollama";
 
 export type PineVersion = "v5" | "v6";
 
@@ -8,6 +8,7 @@ export interface Settings {
   model: string;
   ollamaUrl: string;
   pineVersion: PineVersion;
+  transpilerEnabled?: boolean;
 }
 
 export interface Message {
@@ -23,6 +24,7 @@ export type StreamStatus =
   | "generating"
   | "streaming"
   | "validating"
+  | "transpiling"
   | "reviewing"
   | "correcting"
   | "error";
@@ -49,14 +51,16 @@ export interface ChatState {
 export const DEFAULT_SETTINGS: Settings = {
   provider: "anthropic",
   apiKey: "",
-  model: "claude-sonnet-4-20250514",
+  model: "claude-sonnet-4-6",
   ollamaUrl: "http://localhost:11434",
   pineVersion: "v6",
+  transpilerEnabled: false,
 };
 
 export const PROVIDER_MODELS: Record<Provider, string[]> = {
-  anthropic: ["claude-sonnet-4-20250514", "claude-opus-4-5-20250414"],
-  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4.1"],
+  anthropic: ["claude-sonnet-4-6", "claude-opus-4-6"],
+  openai: ["gpt-4.1", "gpt-4.1-mini", "o3"],
+  google: ["gemini-2.5-pro", "gemini-2.5-flash"],
   ollama: [],
 };
 

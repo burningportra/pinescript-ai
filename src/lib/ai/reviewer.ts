@@ -54,12 +54,17 @@ async function callLLM(
     return response.content[0].type === "text" ? response.content[0].text : "";
   }
 
-  // OpenAI or Ollama
+  // OpenAI, Google, or Ollama
+  const baseURL =
+    provider === "google"
+      ? "https://generativelanguage.googleapis.com/v1beta/openai/"
+      : provider === "ollama"
+        ? `${ollamaUrl || "http://localhost:11434"}/v1`
+        : undefined;
+
   const client = new OpenAI({
-    apiKey: provider === "ollama" ? "ollama" : apiKey,
-    ...(provider === "ollama" && {
-      baseURL: `${ollamaUrl || "http://localhost:11434"}/v1`,
-    }),
+    apiKey: apiKey || "ollama",
+    ...(baseURL && { baseURL }),
   });
 
   const response = await client.chat.completions.create({

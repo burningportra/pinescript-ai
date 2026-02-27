@@ -110,7 +110,7 @@ export default function SettingsPage() {
               AI Provider
             </label>
             <div className="flex gap-2">
-              {(["anthropic", "openai", "ollama"] as Provider[]).map((p) => (
+              {(["anthropic", "openai", "google", "ollama"] as Provider[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => update("provider", p)}
@@ -124,7 +124,9 @@ export default function SettingsPage() {
                     ? "Anthropic"
                     : p === "openai"
                       ? "OpenAI"
-                      : "Ollama"}
+                      : p === "google"
+                        ? "Google"
+                        : "Ollama"}
                 </button>
               ))}
             </div>
@@ -152,7 +154,9 @@ export default function SettingsPage() {
                   placeholder={
                     settings.provider === "anthropic"
                       ? "sk-ant-..."
-                      : "sk-..."
+                      : settings.provider === "google"
+                        ? "AIza..."
+                        : "sk-..."
                   }
                   className="w-full px-3 py-2.5 pr-10 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-border-subtle transition-colors font-mono"
                 />
@@ -200,7 +204,7 @@ export default function SettingsPage() {
           </div>
 
           {/* PineScript Version */}
-          <div className="mb-8">
+          <div className="mb-6">
             <label className="block text-sm font-medium text-text mb-2">
               PineScript Version
             </label>
@@ -219,6 +223,26 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Transpiler Validation */}
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-text mb-2">
+              Transpiler Validation
+            </label>
+            <button
+              onClick={() => update("transpilerEnabled", !settings.transpilerEnabled)}
+              className={`w-full py-2.5 px-3 rounded-lg text-sm text-left border transition-colors ${
+                settings.transpilerEnabled
+                  ? "border-border-subtle bg-surface-elevated text-white"
+                  : "border-border bg-surface text-text-dim hover:border-border-subtle"
+              }`}
+            >
+              <span className="font-medium">{settings.transpilerEnabled ? "Enabled" : "Disabled"}</span>
+              <span className="block text-xs text-text-dim mt-0.5">
+                Experimental — uses pine-transpiler to catch syntax errors via AST parsing
+              </span>
+            </button>
           </div>
 
           {/* Actions */}

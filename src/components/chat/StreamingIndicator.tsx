@@ -8,6 +8,7 @@ const STATUS_TEXT: Record<StreamStatus, string> = {
   generating: "Generating",
   streaming: "Writing code",
   validating: "Running validation checks",
+  transpiling: "Parsing with transpiler",
   reviewing: "AI reviewing code",
   correcting: "Auto-correcting issues",
   error: "Error occurred",

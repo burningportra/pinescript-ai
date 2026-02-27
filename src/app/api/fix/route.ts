@@ -11,6 +11,7 @@ interface FixRequestBody {
     apiKey: string;
     model: string;
     ollamaUrl?: string;
+    transpilerEnabled?: boolean;
   };
   pineVersion: "v5" | "v6";
 }
@@ -52,7 +53,16 @@ export async function POST(req: NextRequest) {
 
     // Re-validate the fixed code statically
     const version = pineVersion === "v5" ? "v5" : "v6";
-    const validation = validatePineScript(fixedCode, version);
+    const staticValidation = validatePineScript(fixedCode, version);
+
+    // Transpiler re-validation (if enabled)
+    let transpilerResults: ValidationResult[] = [];
+    if (settings.transpilerEnabled) {
+      const { transpileValidate } = await import("@/lib/transpiler");
+      transpilerResults = transpileValidate(fixedCode);
+    }
+
+    const validation = [...staticValidation, ...transpilerResults];
 
     return Response.json({ fixedCode, validation });
   } catch (err) {

@@ -7,7 +7,7 @@ import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import OnboardingGate from "@/components/chat/OnboardingGate";
 import { useChat } from "@/hooks/useChat";
-import { STORAGE_KEY, type PineVersion, type SavedChat, type ScriptVersion } from "@/lib/types";
+import { STORAGE_KEY, CHATS_KEY, type PineVersion, type SavedChat, type ScriptVersion, type ScriptSession } from "@/lib/types";
 import dynamic from "next/dynamic";
 
 const EditorPanel = dynamic(() => import("@/components/editor/EditorPanel"), {
@@ -105,6 +105,35 @@ export default function ChatPage() {
     // TODO: Update active session in localStorage when sessions are implemented
   }, [clearLibrary]);
 
+  const handleLoadSession = useCallback((session: ScriptSession) => {
+    // Load the associated chat if it exists
+    try {
+      const chats: SavedChat[] = JSON.parse(localStorage.getItem(CHATS_KEY) || "[]");
+      const associatedChat = chats.find(chat => chat.id === session.chatId);
+      
+      if (associatedChat) {
+        loadChat(associatedChat);
+      } else {
+        clearChat();
+      }
+    } catch {
+      clearChat();
+    }
+    
+    // Load the session code
+    updateCode(session.currentCode);
+    
+    // Load the library if it exists
+    if (session.libraryFile) {
+      setLibrary(session.libraryFile.name, session.libraryFile.code);
+    } else {
+      clearLibrary();
+    }
+    
+    // Load the versions
+    setCurrentVersions(session.versions);
+  }, [loadChat, clearChat, updateCode, setLibrary, clearLibrary]);
+
   const checkSettings = useCallback(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
@@ -166,6 +195,7 @@ export default function ChatPage() {
         onLoadScript={handleLoadScript}
         onLoadChat={handleLoadChat}
         onNewChat={handleNewChat}
+        onLoadSession={handleLoadSession}
       />
       <main className="ml-[56px] flex-1 flex">
         {/* Chat panel */}

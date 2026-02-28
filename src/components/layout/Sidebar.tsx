@@ -9,16 +9,19 @@ import {
   Clock,
   Settings,
   Trash2,
+  Layers,
+  Paperclip,
 } from "lucide-react";
-import type { SavedScript, SavedChat } from "@/lib/types";
-import { SCRIPTS_KEY, CHATS_KEY } from "@/lib/types";
+import type { SavedScript, SavedChat, ScriptSession } from "@/lib/types";
+import { SCRIPTS_KEY, CHATS_KEY, SESSIONS_KEY } from "@/lib/types";
 
-type PanelType = "scripts" | "history" | null;
+type PanelType = "scripts" | "history" | "sessions" | null;
 
 interface SidebarProps {
   onLoadScript?: (code: string, title: string) => void;
   onLoadChat?: (chat: SavedChat) => void;
   onNewChat?: () => void;
+  onLoadSession?: (session: ScriptSession) => void;
 }
 
 function Tooltip({
@@ -137,12 +140,13 @@ function formatTime(ts: number): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: SidebarProps) {
+export default function Sidebar({ onLoadScript, onLoadChat, onNewChat, onLoadSession }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [panel, setPanel] = useState<PanelType>(null);
   const [scripts, setScripts] = useState<SavedScript[]>([]);
   const [chats, setChats] = useState<SavedChat[]>([]);
+  const [sessions, setSessions] = useState<ScriptSession[]>([]);
 
   // Load data when panels open
   useEffect(() => {
@@ -157,6 +161,12 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
         setChats(JSON.parse(localStorage.getItem(CHATS_KEY) || "[]"));
       } catch {
         setChats([]);
+      }
+    } else if (panel === "sessions") {
+      try {
+        setSessions(JSON.parse(localStorage.getItem(SESSIONS_KEY) || "[]"));
+      } catch {
+        setSessions([]);
       }
     }
   }, [panel]);
@@ -175,6 +185,12 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
     const updated = chats.filter((c) => c.id !== id);
     setChats(updated);
     localStorage.setItem(CHATS_KEY, JSON.stringify(updated));
+  }
+
+  function deleteSession(id: string) {
+    const updated = sessions.filter((s) => s.id !== id);
+    setSessions(updated);
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(updated));
   }
 
   return (
@@ -202,6 +218,12 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
                 if (pathname === "/chat") window.location.reload();
               }
             }}
+          />
+          <SidebarButton
+            icon={Layers}
+            tooltip="Script Sessions"
+            active={panel === "sessions"}
+            onClick={() => togglePanel("sessions")}
           />
           <SidebarButton
             icon={FileCode2}
@@ -263,6 +285,59 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteScript(script.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-muted hover:text-accent-error transition-all"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </SlidePanel>
+
+      {/* Script Sessions Panel */}
+      <SlidePanel
+        title="Script Sessions"
+        open={panel === "sessions"}
+        onClose={() => setPanel(null)}
+      >
+        {sessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 text-text-muted text-sm text-center">
+            <Layers size={32} className="mb-3 opacity-50" />
+            <p>No script sessions yet.</p>
+            <p className="text-xs mt-1">Upload scripts to create sessions.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className="group flex items-start gap-2 px-3 py-2.5 rounded-lg hover:bg-surface-elevated transition-colors cursor-pointer"
+                onClick={() => {
+                  onLoadSession?.(session);
+                  setPanel(null);
+                }}
+              >
+                <Layers size={14} className="text-text-dim mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm text-text truncate">{session.title}</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-xs text-text-secondary font-mono">
+                        v{session.versions.length}
+                      </span>
+                      {session.libraryFile && (
+                        <Paperclip size={10} className="text-text-dim" />
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-text-muted">{session.originalFilename}</p>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteSession(session.id);
                   }}
                   className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-muted hover:text-accent-error transition-all"
                 >

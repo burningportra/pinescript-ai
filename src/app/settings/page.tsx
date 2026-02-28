@@ -165,7 +165,7 @@ function SettingsContent() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="ml-[56px] flex-1 flex items-center justify-center p-6">
+      <main className="md:ml-[56px] flex-1 flex items-center justify-center p-4 pt-16 md:p-6">
         <div className="w-full max-w-lg">
           <h1 className="text-2xl font-semibold text-text mb-1">Settings</h1>
           <p className="text-text-dim text-sm mb-8">

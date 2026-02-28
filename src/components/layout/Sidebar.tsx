@@ -9,6 +9,8 @@ import {
   Clock,
   Settings,
   Trash2,
+  Menu,
+  X,
 } from "lucide-react";
 import type { SavedScript, SavedChat } from "@/lib/types";
 import { SCRIPTS_KEY, CHATS_KEY } from "@/lib/types";
@@ -103,7 +105,7 @@ function SlidePanel({
   return (
     <div
       ref={panelRef}
-      className={`fixed left-[56px] top-0 h-full w-72 bg-surface border-r border-border z-40 transition-transform duration-300 ${
+      className={`fixed left-0 md:left-[56px] top-0 h-full w-72 bg-surface border-r border-border z-40 transition-transform duration-300 ${
         open ? "translate-x-0" : "-translate-x-full"
       }`}
     >
@@ -143,6 +145,7 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
   const [panel, setPanel] = useState<PanelType>(null);
   const [scripts, setScripts] = useState<SavedScript[]>([]);
   const [chats, setChats] = useState<SavedChat[]>([]);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   // Load data when panels open
   useEffect(() => {
@@ -177,12 +180,51 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
     localStorage.setItem(CHATS_KEY, JSON.stringify(updated));
   }
 
+  function closeMobile() {
+    setMobileOpen(false);
+    setPanel(null);
+  }
+
   return (
     <>
-      <aside className="fixed left-0 top-0 h-full w-[56px] bg-surface border-r border-border flex flex-col items-center py-4 z-50">
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed top-3 left-3 z-50 w-10 h-10 flex md:hidden items-center justify-center rounded-lg bg-surface border border-border text-text-dim hover:text-text-secondary transition-colors"
+        aria-label="Open menu"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={closeMobile}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-full w-[56px] bg-surface border-r border-border flex flex-col items-center py-4 z-50 transition-transform duration-300 md:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Mobile close button */}
+        <button
+          onClick={closeMobile}
+          className="w-10 h-10 flex md:hidden items-center justify-center rounded-lg text-text-dim hover:text-text-secondary mb-2"
+          aria-label="Close menu"
+        >
+          <X size={20} />
+        </button>
+
         {/* Logo */}
         <button
-          onClick={() => router.push("/")}
+          onClick={() => {
+            router.push("/");
+            closeMobile();
+          }}
           className="w-10 h-10 flex items-center justify-center mb-6"
         >
           <Terminal size={20} className="text-white" />
@@ -201,6 +243,7 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
                 router.push("/chat");
                 if (pathname === "/chat") window.location.reload();
               }
+              closeMobile();
             }}
           />
           <SidebarButton
@@ -226,6 +269,7 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
             onClick={() => {
               setPanel(null);
               router.push("/settings");
+              closeMobile();
             }}
           />
         </div>
@@ -252,6 +296,7 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
                 onClick={() => {
                   onLoadScript?.(script.code, script.title);
                   setPanel(null);
+                  closeMobile();
                 }}
               >
                 <FileCode2 size={14} className="text-text-dim mt-0.5 shrink-0" />
@@ -295,6 +340,7 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
                 onClick={() => {
                   onLoadChat?.(chat);
                   setPanel(null);
+                  closeMobile();
                 }}
               >
                 <Clock size={14} className="text-text-dim mt-0.5 shrink-0" />

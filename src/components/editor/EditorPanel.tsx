@@ -127,16 +127,16 @@ export default function EditorPanel({
   return (
     <div className="h-full flex flex-col bg-background border-l border-border">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface">
-        <div className="flex items-center gap-2.5">
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated text-text-secondary border border-border">
+      <div className="flex items-center justify-between px-2 md:px-4 py-2.5 border-b border-border bg-surface">
+        <div className="flex items-center gap-1.5 md:gap-2.5 min-w-0">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated text-text-secondary border border-border shrink-0">
             Pine {pineVersion}
           </span>
-          <span className="text-sm text-text font-medium truncate max-w-[200px]">
+          <span className="text-sm text-text font-medium truncate max-w-[120px] md:max-w-[200px]">
             {title || "Generated Script"}
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 md:gap-1 shrink-0">
           <button
             onClick={copyCode}
             className="w-8 h-8 flex items-center justify-center rounded-md text-text-dim hover:text-text-secondary hover:bg-surface-elevated transition-colors"

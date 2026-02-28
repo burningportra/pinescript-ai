@@ -132,7 +132,7 @@ async function streamAnthropic(
   const stream = client.messages.stream(
     {
       model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: systemPrompt,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     },

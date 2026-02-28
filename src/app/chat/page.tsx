@@ -35,6 +35,7 @@ const ACTION_BUTTONS = [
 export default function ChatPage() {
   const [hasSettings, setHasSettings] = useState<boolean | null>(null);
   const [pineVersion, setPineVersion] = useState<PineVersion>("v6");
+  const [uploadContext, setUploadContext] = useState<{ filename: string } | null>(null);
 
   const {
     messages,
@@ -65,7 +66,17 @@ export default function ChatPage() {
 
   const handleNewChat = useCallback(() => {
     clearChat();
+    setUploadContext(null);
   }, [clearChat]);
+
+  const handleUpload = useCallback((code: string, filename: string) => {
+    updateCode(code);
+    setUploadContext({ filename });
+  }, [updateCode]);
+
+  const handleDismissUpload = useCallback(() => {
+    setUploadContext(null);
+  }, []);
 
   const checkSettings = useCallback(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -139,7 +150,13 @@ export default function ChatPage() {
                   ))}
                 </div>
 
-                <ChatInput onSend={sendMessage} disabled={isStreaming} />
+                <ChatInput
+                  onSend={sendMessage}
+                  onUpload={handleUpload}
+                  uploadContext={uploadContext}
+                  onDismissUpload={handleDismissUpload}
+                  disabled={isStreaming}
+                />
               </div>
             </div>
           ) : (
@@ -159,6 +176,9 @@ export default function ChatPage() {
               {/* Input */}
               <ChatInput
                 onSend={sendMessage}
+                onUpload={handleUpload}
+                uploadContext={uploadContext}
+                onDismissUpload={handleDismissUpload}
                 disabled={isStreaming}
                 placeholder={hasCode ? "Ask for modifications..." : undefined}
               />

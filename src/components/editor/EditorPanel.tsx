@@ -5,11 +5,11 @@ import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching, foldGutter } from "@codemirror/language";
-import { Copy, Check, Save, Download, Trash2 } from "lucide-react";
+import { Copy, Check, Save, Download, Trash2, History, ChevronDown } from "lucide-react";
 import { pineScriptLanguage } from "./pine-language";
 import { pineTheme, pineHighlight } from "./codemirror-theme";
 import ValidationPanel from "./ValidationPanel";
-import type { PineVersion, ValidationResult, StreamStatus } from "@/lib/types";
+import type { PineVersion, ValidationResult, StreamStatus, ScriptVersion } from "@/lib/types";
 import { SCRIPTS_KEY } from "@/lib/types";
 
 interface EditorPanelProps {
@@ -22,6 +22,8 @@ interface EditorPanelProps {
   correctedCode?: string | null;
   streamStatus?: StreamStatus;
   onFix?: () => void;
+  versions?: ScriptVersion[];
+  onRestoreVersion?: (code: string, version: number) => void;
 }
 
 export default function EditorPanel({
@@ -34,14 +36,41 @@ export default function EditorPanel({
   correctedCode = null,
   streamStatus,
   onFix,
+  versions = [],
+  onRestoreVersion,
 }: EditorPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showVersionDropdown, setShowVersionDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const onCodeChangeRef = useRef(onCodeChange);
   onCodeChangeRef.current = onCodeChange;
+
+  const formatRelativeTime = useCallback((timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 1) return "just now";
+    if (minutes === 1) return "1 min ago";
+    if (minutes < 60) return `${minutes} min ago`;
+    
+    const hours = Math.floor(minutes / 60);
+    if (hours === 1) return "1 hour ago";
+    if (hours < 24) return `${hours} hours ago`;
+    
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "1 day ago";
+    return `${days} days ago`;
+  }, []);
+
+  const handleVersionClick = useCallback((version: ScriptVersion) => {
+    onRestoreVersion?.(version.code, version.version);
+    setShowVersionDropdown(false);
+  }, [onRestoreVersion]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -124,6 +153,20 @@ export default function EditorPanel({
     URL.revokeObjectURL(url);
   }, [code, title]);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowVersionDropdown(false);
+      }
+    };
+
+    if (showVersionDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showVersionDropdown]);
+
   return (
     <div className="h-full flex flex-col bg-background border-l border-border">
       {/* Header */}
@@ -135,6 +178,47 @@ export default function EditorPanel({
           <span className="text-sm text-text font-medium truncate max-w-[200px]">
             {title || "Generated Script"}
           </span>
+          
+          {/* Version dropdown */}
+          {versions.length > 0 && (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setShowVersionDropdown(!showVersionDropdown)}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-text-secondary hover:text-text hover:bg-surface-elevated rounded-md transition-colors"
+                title="Version history"
+              >
+                <History size={12} />
+                <span>v{versions.length}</span>
+                <ChevronDown size={12} />
+              </button>
+              
+              {showVersionDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-surface border border-border rounded-lg shadow-lg z-50">
+                  <div className="py-1 max-h-64 overflow-y-auto">
+                    {[...versions].reverse().map((version, idx) => (
+                      <button
+                        key={version.version}
+                        onClick={() => handleVersionClick(version)}
+                        className="w-full px-3 py-2 text-left hover:bg-surface-elevated transition-colors flex items-center justify-between"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs text-text">v{version.version}</span>
+                          <span className="text-[10px] text-text-muted">
+                            {formatRelativeTime(version.timestamp)}
+                          </span>
+                        </div>
+                        {idx === 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            current
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button

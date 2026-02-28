@@ -7,7 +7,7 @@ import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
 import OnboardingGate from "@/components/chat/OnboardingGate";
 import { useChat } from "@/hooks/useChat";
-import { STORAGE_KEY, type PineVersion, type SavedChat } from "@/lib/types";
+import { STORAGE_KEY, type PineVersion, type SavedChat, type ScriptVersion } from "@/lib/types";
 import dynamic from "next/dynamic";
 
 const EditorPanel = dynamic(() => import("@/components/editor/EditorPanel"), {
@@ -36,6 +36,8 @@ export default function ChatPage() {
   const [hasSettings, setHasSettings] = useState<boolean | null>(null);
   const [pineVersion, setPineVersion] = useState<PineVersion>("v6");
   const [uploadContext, setUploadContext] = useState<{ filename: string } | null>(null);
+  const [currentVersions, setCurrentVersions] = useState<ScriptVersion[]>([]);
+  const [wasStreaming, setWasStreaming] = useState(false);
 
   const {
     messages,
@@ -85,6 +87,11 @@ export default function ChatPage() {
     setUploadContext(null);
   }, []);
 
+  const handleRestoreVersion = useCallback((code: string, version: number) => {
+    updateCode(code);
+    // Note: This doesn't create a new version, just restores the code
+  }, [updateCode]);
+
   const checkSettings = useCallback(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
@@ -107,6 +114,33 @@ export default function ChatPage() {
   useEffect(() => {
     checkSettings();
   }, [checkSettings]);
+
+  // Track streaming state changes
+  useEffect(() => {
+    setWasStreaming(isStreaming);
+  }, [isStreaming]);
+
+  // Version auto-save: when streaming completes and we have new code
+  useEffect(() => {
+    if (wasStreaming && !isStreaming && currentCode) {
+      const latestVersion = currentVersions[currentVersions.length - 1];
+      if (latestVersion?.code !== currentCode) {
+        const newVersion: ScriptVersion = {
+          version: currentVersions.length + 1,
+          code: currentCode,
+          timestamp: Date.now(),
+        };
+        setCurrentVersions(prev => [...prev, newVersion]);
+      }
+    }
+  }, [wasStreaming, isStreaming, currentCode, currentVersions]);
+
+  // Reset versions when starting a new chat
+  useEffect(() => {
+    if (messages.length === 0) {
+      setCurrentVersions([]);
+    }
+  }, [messages.length]);
 
   // Loading
   if (hasSettings === null) return null;
@@ -206,6 +240,8 @@ export default function ChatPage() {
               correctedCode={correctedCode}
               streamStatus={streamStatus}
               onFix={fixCode}
+              versions={currentVersions}
+              onRestoreVersion={handleRestoreVersion}
             />
           </div>
         )}

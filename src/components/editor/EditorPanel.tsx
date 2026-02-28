@@ -2,18 +2,12 @@
 
 import { useRef, useEffect, useCallback, useState } from "react";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching, foldGutter } from "@codemirror/language";
 import { Copy, Check, Save, Download, Trash2 } from "lucide-react";
 import { pineScriptLanguage } from "./pine-language";
-import {
-  pineTheme,
-  pineHighlight,
-  pineLightTheme,
-  pineLightHighlight,
-} from "./codemirror-theme";
-import { useTheme } from "@/hooks/useTheme";
+import { pineTheme, pineHighlight } from "./codemirror-theme";
 import ValidationPanel from "./ValidationPanel";
 import type { PineVersion, ValidationResult, StreamStatus } from "@/lib/types";
 import { SCRIPTS_KEY } from "@/lib/types";
@@ -43,10 +37,8 @@ export default function EditorPanel({
 }: EditorPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const themeCompRef = useRef(new Compartment());
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
-  const { resolvedTheme } = useTheme();
 
   const onCodeChangeRef = useRef(onCodeChange);
   onCodeChangeRef.current = onCodeChange;
@@ -54,8 +46,6 @@ export default function EditorPanel({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const themeComp = themeCompRef.current;
-    const isDark = resolvedTheme === "dark";
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         onCodeChangeRef.current(update.state.doc.toString());
@@ -70,11 +60,8 @@ export default function EditorPanel({
         bracketMatching(),
         foldGutter(),
         pineScriptLanguage,
-        themeComp.of(
-          isDark
-            ? [pineTheme, pineHighlight]
-            : [pineLightTheme, pineLightHighlight]
-        ),
+        pineTheme,
+        pineHighlight,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         updateListener,
         EditorView.lineWrapping,
@@ -94,19 +81,6 @@ export default function EditorPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const isDark = resolvedTheme === "dark";
-    view.dispatch({
-      effects: themeCompRef.current.reconfigure(
-        isDark
-          ? [pineTheme, pineHighlight]
-          : [pineLightTheme, pineLightHighlight]
-      ),
-    });
-  }, [resolvedTheme]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -153,16 +127,16 @@ export default function EditorPanel({
   return (
     <div className="h-full flex flex-col bg-background border-l border-border">
       {/* Header */}
-      <div className="flex items-center justify-between px-2 md:px-4 py-2.5 border-b border-border bg-surface">
-        <div className="flex items-center gap-1.5 md:gap-2.5 min-w-0">
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated text-text-secondary border border-border shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-surface">
+        <div className="flex items-center gap-2.5">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated text-text-secondary border border-border">
             Pine {pineVersion}
           </span>
-          <span className="text-sm text-text font-medium truncate max-w-[120px] md:max-w-[200px]">
+          <span className="text-sm text-text font-medium truncate max-w-[200px]">
             {title || "Generated Script"}
           </span>
         </div>
-        <div className="flex items-center gap-0.5 md:gap-1 shrink-0">
+        <div className="flex items-center gap-1">
           <button
             onClick={copyCode}
             className="w-8 h-8 flex items-center justify-center rounded-md text-text-dim hover:text-text-secondary hover:bg-surface-elevated transition-colors"

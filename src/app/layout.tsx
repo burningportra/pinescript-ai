@@ -25,14 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=localStorage.getItem("theme-preference")||"system";var t=p==="system"?window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light":p;document.documentElement.setAttribute("data-theme",t)}catch(e){document.documentElement.setAttribute("data-theme","dark")}})()`,
-          }}
-        />
-      </head>
+    <html lang="en">
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased bg-background text-text font-sans`}
       >

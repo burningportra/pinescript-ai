@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Code2, TrendingUp, Lightbulb, MessageSquare, FileCode2 } from "lucide-react";
+import { Code2, TrendingUp, Lightbulb } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import MessageList from "@/components/chat/MessageList";
 import ChatInput from "@/components/chat/ChatInput";
@@ -32,12 +32,9 @@ const ACTION_BUTTONS = [
   },
 ];
 
-type MobileTab = "chat" | "editor";
-
 export default function ChatPage() {
   const [hasSettings, setHasSettings] = useState<boolean | null>(null);
   const [pineVersion, setPineVersion] = useState<PineVersion>("v6");
-  const [mobileTab, setMobileTab] = useState<MobileTab>("chat");
 
   const {
     messages,
@@ -58,13 +55,6 @@ export default function ChatPage() {
 
   const hasCode = currentCode.length > 0;
 
-  // Auto-switch to editor tab on mobile when code is generated
-  useEffect(() => {
-    if (hasCode && messages.length > 0) {
-      setMobileTab("editor");
-    }
-  }, [hasCode, messages.length]);
-
   const handleLoadScript = useCallback((code: string, title: string) => {
     updateCode(code);
   }, [updateCode]);
@@ -75,7 +65,6 @@ export default function ChatPage() {
 
   const handleNewChat = useCallback(() => {
     clearChat();
-    setMobileTab("chat");
   }, [clearChat]);
 
   const checkSettings = useCallback(() => {
@@ -113,49 +102,19 @@ export default function ChatPage() {
         onLoadChat={handleLoadChat}
         onNewChat={handleNewChat}
       />
-      <main className="md:ml-[56px] flex-1 flex flex-col md:flex-row">
-        {/* Mobile tab bar — only shown when code exists */}
-        {hasCode && (
-          <div className="flex md:hidden border-b border-border bg-surface sticky top-0 z-30">
-            <button
-              onClick={() => setMobileTab("chat")}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-                mobileTab === "chat"
-                  ? "text-text border-b-2 border-white"
-                  : "text-text-dim"
-              }`}
-            >
-              <MessageSquare size={16} />
-              Chat
-            </button>
-            <button
-              onClick={() => setMobileTab("editor")}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
-                mobileTab === "editor"
-                  ? "text-text border-b-2 border-white"
-                  : "text-text-dim"
-              }`}
-            >
-              <FileCode2 size={16} />
-              Editor
-            </button>
-          </div>
-        )}
-
+      <main className="ml-[56px] flex-1 flex">
         {/* Chat panel */}
         <div
           className={`flex flex-col transition-all duration-500 ease-in-out ${
-            hasCode
-              ? `md:w-[55%] ${mobileTab === "chat" ? "flex" : "hidden md:flex"}`
-              : "w-full"
-          } ${hasCode && mobileTab === "chat" ? "min-h-screen md:min-h-0" : ""}`}
+            hasCode ? "w-[55%]" : "w-full"
+          }`}
         >
           {/* Onboarding gate — no settings yet */}
           {!hasSettings ? (
             <OnboardingGate onComplete={checkSettings} />
           ) : !hasMessages ? (
             /* Empty state */
-            <div className="flex-1 flex flex-col items-center justify-center px-4 md:px-6 pt-14 md:pt-0">
+            <div className="flex-1 flex flex-col items-center justify-center px-6">
               <div className="max-w-lg w-full text-center">
                 <Code2 size={48} className="text-text-dim mx-auto mb-5" />
                 <h1 className="text-xl font-semibold text-text mb-2">
@@ -166,13 +125,13 @@ export default function ChatPage() {
                 </p>
 
                 {/* Action buttons */}
-                <div className="flex flex-col sm:flex-row gap-2 justify-center mb-8">
+                <div className="flex gap-2 justify-center mb-8">
                   {ACTION_BUTTONS.map((btn) => (
                     <button
                       key={btn.label}
                       disabled={isStreaming}
                       onClick={() => sendMessage(btn.prompt)}
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-surface text-text-dim hover:border-border-subtle hover:text-text-secondary text-sm transition-colors"
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-surface text-text-dim hover:border-border-subtle hover:text-text-secondary text-sm transition-colors"
                     >
                       <btn.icon size={16} />
                       {btn.label}
@@ -185,10 +144,8 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
-              {/* Messages — add top padding on mobile for hamburger button */}
-              <div className="pt-12 md:pt-0">
-                <MessageList messages={messages} streamStatus={streamStatus} />
-              </div>
+              {/* Messages */}
+              <MessageList messages={messages} streamStatus={streamStatus} />
 
               {/* Error */}
               {error && (
@@ -211,20 +168,13 @@ export default function ChatPage() {
 
         {/* Editor panel */}
         {hasCode && (
-          <div
-            className={`md:w-[45%] h-screen sticky top-0 ${
-              mobileTab === "editor" ? "block" : "hidden md:block"
-            }`}
-          >
+          <div className="w-[45%] h-screen sticky top-0">
             <EditorPanel
               code={currentCode}
               title={codeTitle}
               pineVersion={pineVersion}
               onCodeChange={updateCode}
-              onClear={() => {
-                clearCode();
-                setMobileTab("chat");
-              }}
+              onClear={clearCode}
               validationResults={validationResults}
               correctedCode={correctedCode}
               streamStatus={streamStatus}

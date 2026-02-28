@@ -136,30 +136,6 @@ docker compose up --build
 
 The app will be available at [http://localhost:3000](http://localhost:3000).
 
-### Dev Environment
-
-Use the dev compose file for hot reload during development:
-
-```bash
-# Quick start (handles install + RAG build + compose up)
-./scripts/dev-setup.sh
-
-# Or manually
-docker compose -f docker-compose.dev.yml up --build
-```
-
-Edit any file locally and the Next.js dev server inside the container will hot-reload automatically.
-
-#### Local LLM with Ollama
-
-Start the Ollama sidecar alongside the dev environment:
-
-```bash
-docker compose -f docker-compose.dev.yml --profile local-llm up --build
-```
-
-Ollama will be available at `http://localhost:11434`. Configure it in the app's Settings page.
-
 ## Tech Stack
 
 - [Next.js 16](https://nextjs.org) — App Router, TypeScript strict mode

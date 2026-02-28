@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-:root {
+:root, [data-theme="dark"] {
   --background: #09090b;
   --surface: #18181b;
   --surface-elevated: #27272a;
@@ -14,6 +14,22 @@
   --accent-warning: #eab308;
   --accent-error: #ef4444;
   --code-background: #0c0c0e;
+}
+
+[data-theme="light"] {
+  --background: #ffffff;
+  --surface: #f4f4f5;
+  --surface-elevated: #e4e4e7;
+  --border: #e4e4e7;
+  --border-subtle: #d4d4d8;
+  --text: #18181b;
+  --text-secondary: #52525b;
+  --text-dim: #71717a;
+  --text-muted: #a1a1aa;
+  --accent-success: #16a34a;
+  --accent-warning: #ca8a04;
+  --accent-error: #dc2626;
+  --code-background: #f8f8fa;
 }
 
 @theme inline {
@@ -64,6 +80,10 @@ body {
 ::selection {
   background: rgba(161, 161, 170, 0.25);
   color: var(--text);
+}
+
+[data-theme="light"] ::selection {
+  background: rgba(24, 24, 27, 0.15);
 }
 
 /* Streaming dots animation */

@@ -2,12 +2,18 @@
 
 import { useRef, useEffect, useCallback, useState } from "react";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching, foldGutter } from "@codemirror/language";
 import { Copy, Check, Save, Download, Trash2 } from "lucide-react";
 import { pineScriptLanguage } from "./pine-language";
-import { pineTheme, pineHighlight } from "./codemirror-theme";
+import {
+  pineTheme,
+  pineHighlight,
+  pineLightTheme,
+  pineLightHighlight,
+} from "./codemirror-theme";
+import { useTheme } from "@/hooks/useTheme";
 import ValidationPanel from "./ValidationPanel";
 import type { PineVersion, ValidationResult, StreamStatus } from "@/lib/types";
 import { SCRIPTS_KEY } from "@/lib/types";
@@ -37,8 +43,10 @@ export default function EditorPanel({
 }: EditorPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const themeCompRef = useRef(new Compartment());
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { resolvedTheme } = useTheme();
 
   const onCodeChangeRef = useRef(onCodeChange);
   onCodeChangeRef.current = onCodeChange;
@@ -46,6 +54,8 @@ export default function EditorPanel({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const themeComp = themeCompRef.current;
+    const isDark = resolvedTheme === "dark";
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         onCodeChangeRef.current(update.state.doc.toString());
@@ -60,8 +70,11 @@ export default function EditorPanel({
         bracketMatching(),
         foldGutter(),
         pineScriptLanguage,
-        pineTheme,
-        pineHighlight,
+        themeComp.of(
+          isDark
+            ? [pineTheme, pineHighlight]
+            : [pineLightTheme, pineLightHighlight]
+        ),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         updateListener,
         EditorView.lineWrapping,
@@ -81,6 +94,19 @@ export default function EditorPanel({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const isDark = resolvedTheme === "dark";
+    view.dispatch({
+      effects: themeCompRef.current.reconfigure(
+        isDark
+          ? [pineTheme, pineHighlight]
+          : [pineLightTheme, pineLightHighlight]
+      ),
+    });
+  }, [resolvedTheme]);
 
   useEffect(() => {
     const view = viewRef.current;

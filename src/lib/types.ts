@@ -49,6 +49,9 @@ export interface ChatState {
   error: string | null;
   validationResults: ValidationResult[];
   correctedCode: string | null;
+  tabs: EditorTab[];
+  activeTabId: string | null;
+  preCorrectCode: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -107,6 +110,22 @@ export interface ScriptSession {
 }
 
 export const SESSIONS_KEY = "pinescript-ai-sessions";
+export const TABS_KEY = "pinescript-ai-tabs";
+export const SNIPPETS_KEY = "pinescript-ai-snippets";
+
+export interface EditorTab {
+  id: string;
+  title: string;
+  code: string;
+  createdAt: number;
+}
+
+export interface CodeSnippet {
+  id: string;
+  title: string;
+  code: string;
+  createdAt: number;
+}
 
 export interface ReviewIssue {
   severity: "error" | "warning" | "info";

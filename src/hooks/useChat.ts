@@ -1,20 +1,34 @@
 "use client";
 
 import { useReducer, useCallback, useRef, useEffect } from "react";
-import type { ChatState, Message, StreamStatus, Settings, ValidationResult, SavedChat } from "@/lib/types";
-import { CHATS_KEY } from "@/lib/types";
+import type {
+  ChatState,
+  Message,
+  StreamStatus,
+  Settings,
+  ValidationResult,
+  SavedChat,
+  EditorTab,
+} from "@/lib/types";
+import { CHATS_KEY, TABS_KEY } from "@/lib/types";
 
 // Actions
 type Action =
   | { type: "ADD_MESSAGE"; message: Message }
   | { type: "UPDATE_ASSISTANT"; content: string }
-  | { type: "SET_CODE"; code: string; title: string }
+  | { type: "SET_CODE"; code: string; title: string; newTab?: boolean }
   | { type: "SET_STREAM_STATUS"; status: StreamStatus }
   | { type: "SET_ERROR"; error: string }
   | { type: "SET_VALIDATION"; results: ValidationResult[]; correctedCode: string | null }
   | { type: "CLEAR_ERROR" }
   | { type: "LOAD_CHAT"; messages: Message[]; currentCode: string; codeTitle: string }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "CLOSE_TAB"; tabId: string }
+  | { type: "SET_ACTIVE_TAB"; tabId: string }
+  | { type: "REORDER_TABS"; tabIds: string[] }
+  | { type: "LOAD_TABS"; tabs: EditorTab[]; activeTabId: string | null }
+  | { type: "ACCEPT_CORRECTION" }
+  | { type: "REJECT_CORRECTION" };
 
 const initialState: ChatState = {
   messages: [],
@@ -25,7 +39,14 @@ const initialState: ChatState = {
   error: null,
   validationResults: [],
   correctedCode: null,
+  tabs: [],
+  activeTabId: null,
+  preCorrectCode: null,
 };
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 
 function reducer(state: ChatState, action: Action): ChatState {
   switch (action.type) {
@@ -39,8 +60,44 @@ function reducer(state: ChatState, action: Action): ChatState {
       }
       return { ...state, messages: msgs };
     }
-    case "SET_CODE":
-      return { ...state, currentCode: action.code, codeTitle: action.title };
+    case "SET_CODE": {
+      let tabs = [...state.tabs];
+      let activeTabId = state.activeTabId;
+
+      if (action.newTab || tabs.length === 0) {
+        // Create new tab
+        const id = generateId();
+        tabs = [...tabs, {
+          id,
+          title: action.title || "Untitled Script",
+          code: action.code,
+          createdAt: Date.now(),
+        }];
+        activeTabId = id;
+        // Max 10 tabs
+        if (tabs.length > 10) {
+          tabs = tabs.slice(-10);
+          if (!tabs.find(t => t.id === activeTabId)) {
+            activeTabId = tabs[tabs.length - 1]?.id || null;
+          }
+        }
+      } else if (activeTabId) {
+        // Update active tab
+        tabs = tabs.map(t =>
+          t.id === activeTabId
+            ? { ...t, code: action.code, title: action.title || t.title }
+            : t
+        );
+      }
+
+      return {
+        ...state,
+        currentCode: action.code,
+        codeTitle: action.title,
+        tabs,
+        activeTabId,
+      };
+    }
     case "SET_STREAM_STATUS":
       return {
         ...state,
@@ -54,25 +111,118 @@ function reducer(state: ChatState, action: Action): ChatState {
         ...state,
         validationResults: action.results,
         correctedCode: action.correctedCode,
+        preCorrectCode: action.correctedCode ? state.currentCode : null,
       };
     case "CLEAR_ERROR":
       return { ...state, error: null, streamStatus: "idle" };
-    case "LOAD_CHAT":
+    case "LOAD_CHAT": {
+      let tabs = [...state.tabs];
+      let activeTabId = state.activeTabId;
+
+      if (action.currentCode) {
+        const id = generateId();
+        tabs = [...tabs, {
+          id,
+          title: action.codeTitle || "Loaded Script",
+          code: action.currentCode,
+          createdAt: Date.now(),
+        }];
+        activeTabId = id;
+        if (tabs.length > 10) tabs = tabs.slice(-10);
+      }
+
       return {
         ...initialState,
         messages: action.messages,
         currentCode: action.currentCode,
         codeTitle: action.codeTitle,
+        tabs,
+        activeTabId,
       };
+    }
     case "RESET":
       return initialState;
+    case "CLOSE_TAB": {
+      const tabs = state.tabs.filter(t => t.id !== action.tabId);
+      let activeTabId = state.activeTabId;
+      let currentCode = state.currentCode;
+      let codeTitle = state.codeTitle;
+
+      if (activeTabId === action.tabId) {
+        const idx = state.tabs.findIndex(t => t.id === action.tabId);
+        const next = tabs[idx] || tabs[idx - 1] || null;
+        activeTabId = next?.id || null;
+        currentCode = next?.code || "";
+        codeTitle = next?.title || "";
+      }
+
+      return {
+        ...state,
+        tabs,
+        activeTabId,
+        currentCode,
+        codeTitle,
+        validationResults: [],
+        correctedCode: null,
+        preCorrectCode: null,
+      };
+    }
+    case "SET_ACTIVE_TAB": {
+      const tab = state.tabs.find(t => t.id === action.tabId);
+      if (!tab) return state;
+      return {
+        ...state,
+        activeTabId: action.tabId,
+        currentCode: tab.code,
+        codeTitle: tab.title,
+        validationResults: [],
+        correctedCode: null,
+        preCorrectCode: null,
+      };
+    }
+    case "REORDER_TABS": {
+      const tabMap = new Map(state.tabs.map(t => [t.id, t]));
+      const reordered = action.tabIds.map(id => tabMap.get(id)).filter(Boolean) as EditorTab[];
+      return { ...state, tabs: reordered };
+    }
+    case "LOAD_TABS": {
+      const activeTab = action.tabs.find(t => t.id === action.activeTabId) || action.tabs[0];
+      return {
+        ...state,
+        tabs: action.tabs,
+        activeTabId: activeTab?.id || null,
+        currentCode: activeTab?.code || state.currentCode,
+        codeTitle: activeTab?.title || state.codeTitle,
+      };
+    }
+    case "ACCEPT_CORRECTION": {
+      if (!state.correctedCode) return state;
+      const code = state.correctedCode;
+      const titleMatch = code.match(/(?:indicator|strategy)\s*\(\s*["']([^"']+)["']/);
+      const title = titleMatch ? titleMatch[1] : state.codeTitle;
+
+      const tabs = state.tabs.map(t =>
+        t.id === state.activeTabId ? { ...t, code, title } : t
+      );
+
+      return {
+        ...state,
+        currentCode: code,
+        codeTitle: title,
+        correctedCode: null,
+        preCorrectCode: null,
+        tabs,
+      };
+    }
+    case "REJECT_CORRECTION":
+      return {
+        ...state,
+        correctedCode: null,
+        preCorrectCode: null,
+      };
     default:
       return state;
   }
-}
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 // Extract code from streaming content incrementally
@@ -95,6 +245,37 @@ export function useChat() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const abortRef = useRef<AbortController | null>(null);
   const chatIdRef = useRef(generateId());
+
+  // Load persisted tabs on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(TABS_KEY);
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.tabs?.length > 0) {
+          dispatch({
+            type: "LOAD_TABS",
+            tabs: data.tabs,
+            activeTabId: data.activeTabId,
+          });
+        }
+      }
+    } catch {
+      // Ignore invalid stored data
+    }
+  }, []);
+
+  // Persist tabs to localStorage
+  useEffect(() => {
+    if (state.tabs.length > 0) {
+      localStorage.setItem(TABS_KEY, JSON.stringify({
+        tabs: state.tabs,
+        activeTabId: state.activeTabId,
+      }));
+    } else {
+      localStorage.removeItem(TABS_KEY);
+    }
+  }, [state.tabs, state.activeTabId]);
 
   // Auto-save chat to localStorage when not streaming and messages exist
   useEffect(() => {
@@ -207,6 +388,7 @@ export function useChat() {
       const decoder = new TextDecoder();
       let fullContent = "";
       let codeDetected = false;
+      let tabCreated = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -233,24 +415,13 @@ export function useChat() {
               continue;
             }
 
-            // Handle validation results
+            // Handle validation results (don't auto-apply corrections — show diff instead)
             if (parsed.validation) {
               dispatch({
                 type: "SET_VALIDATION",
                 results: parsed.validation,
                 correctedCode: parsed.correctedCode || null,
               });
-              // If there's corrected code, update the editor
-              if (parsed.correctedCode) {
-                const titleMatch = parsed.correctedCode.match(
-                  /(?:indicator|strategy)\s*\(\s*["']([^"']+)["']/,
-                );
-                dispatch({
-                  type: "SET_CODE",
-                  code: parsed.correctedCode,
-                  title: titleMatch ? titleMatch[1] : state.codeTitle,
-                });
-              }
               continue;
             }
 
@@ -271,7 +442,9 @@ export function useChat() {
                     type: "SET_CODE",
                     code: extracted.code,
                     title: extracted.title,
+                    newTab: !tabCreated,
                   });
+                  if (!tabCreated) tabCreated = true;
                 }
               }
             }
@@ -336,17 +509,7 @@ export function useChat() {
 
       const { fixedCode: fixed, validation } = await res.json();
 
-      if (fixed) {
-        const titleMatch = fixed.match(
-          /(?:indicator|strategy)\s*\(\s*["']([^"']+)["']/,
-        );
-        dispatch({
-          type: "SET_CODE",
-          code: fixed,
-          title: titleMatch ? titleMatch[1] : state.codeTitle,
-        });
-      }
-
+      // Don't auto-apply — store for diff view
       dispatch({
         type: "SET_VALIDATION",
         results: validation || [],
@@ -379,13 +542,37 @@ export function useChat() {
   }, []);
 
   const clearCode = useCallback(() => {
-    dispatch({ type: "SET_CODE", code: "", title: "" });
-    dispatch({ type: "SET_VALIDATION", results: [], correctedCode: null });
-  }, []);
+    if (state.activeTabId) {
+      dispatch({ type: "CLOSE_TAB", tabId: state.activeTabId });
+    } else {
+      dispatch({ type: "SET_CODE", code: "", title: "" });
+      dispatch({ type: "SET_VALIDATION", results: [], correctedCode: null });
+    }
+  }, [state.activeTabId]);
 
   const updateCode = useCallback((code: string) => {
     dispatch({ type: "SET_CODE", code, title: state.codeTitle });
   }, [state.codeTitle]);
+
+  const closeTab = useCallback((tabId: string) => {
+    dispatch({ type: "CLOSE_TAB", tabId });
+  }, []);
+
+  const setActiveTab = useCallback((tabId: string) => {
+    dispatch({ type: "SET_ACTIVE_TAB", tabId });
+  }, []);
+
+  const reorderTabs = useCallback((tabIds: string[]) => {
+    dispatch({ type: "REORDER_TABS", tabIds });
+  }, []);
+
+  const acceptCorrection = useCallback(() => {
+    dispatch({ type: "ACCEPT_CORRECTION" });
+  }, []);
+
+  const rejectCorrection = useCallback(() => {
+    dispatch({ type: "REJECT_CORRECTION" });
+  }, []);
 
   return {
     ...state,
@@ -395,5 +582,10 @@ export function useChat() {
     clearChat,
     clearCode,
     updateCode,
+    closeTab,
+    setActiveTab,
+    reorderTabs,
+    acceptCorrection,
+    rejectCorrection,
   };
 }

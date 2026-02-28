@@ -46,12 +46,20 @@ export default function ChatPage() {
     error,
     validationResults,
     correctedCode,
+    preCorrectCode,
+    tabs,
+    activeTabId,
     sendMessage,
     fixCode,
     loadChat,
     clearChat,
     clearCode,
     updateCode,
+    closeTab,
+    setActiveTab,
+    reorderTabs,
+    acceptCorrection,
+    rejectCorrection,
   } = useChat();
 
   const hasCode = currentCode.length > 0;
@@ -197,8 +205,16 @@ export default function ChatPage() {
               onClear={clearCode}
               validationResults={validationResults}
               correctedCode={correctedCode}
+              preCorrectCode={preCorrectCode}
               streamStatus={streamStatus}
               onFix={fixCode}
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabSelect={setActiveTab}
+              onTabClose={closeTab}
+              onTabReorder={reorderTabs}
+              onAcceptCorrection={acceptCorrection}
+              onRejectCorrection={rejectCorrection}
             />
           </div>
         )}

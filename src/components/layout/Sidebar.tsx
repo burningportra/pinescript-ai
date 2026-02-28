@@ -11,9 +11,13 @@ import {
   Trash2,
   Menu,
   X,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import type { SavedScript, SavedChat } from "@/lib/types";
 import { SCRIPTS_KEY, CHATS_KEY } from "@/lib/types";
+import { useTheme, type ThemePreference } from "@/hooks/useTheme";
 
 type PanelType = "scripts" | "history" | null;
 
@@ -139,6 +143,10 @@ function formatTime(ts: number): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+const themeOrder: ThemePreference[] = ["system", "light", "dark"];
+const themeIcons = { system: Monitor, light: Sun, dark: Moon };
+const themeLabels = { system: "System", light: "Light", dark: "Dark" };
+
 export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -146,6 +154,12 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
   const [scripts, setScripts] = useState<SavedScript[]>([]);
   const [chats, setChats] = useState<SavedChat[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { preference, setTheme } = useTheme();
+
+  function cycleTheme() {
+    const idx = themeOrder.indexOf(preference);
+    setTheme(themeOrder[(idx + 1) % themeOrder.length]);
+  }
 
   // Load data when panels open
   useEffect(() => {
@@ -260,8 +274,13 @@ export default function Sidebar({ onLoadScript, onLoadChat, onNewChat }: Sidebar
           />
         </div>
 
-        {/* Spacer + Settings at bottom */}
-        <div className="mt-auto">
+        {/* Spacer + Theme toggle + Settings at bottom */}
+        <div className="mt-auto flex flex-col gap-1.5">
+          <SidebarButton
+            icon={themeIcons[preference]}
+            tooltip={`Theme: ${themeLabels[preference]}`}
+            onClick={cycleTheme}
+          />
           <SidebarButton
             icon={Settings}
             tooltip="Settings"

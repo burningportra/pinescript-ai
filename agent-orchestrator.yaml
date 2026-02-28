@@ -1,0 +1,36 @@
+dataDir: ~/.agent-orchestrator
+worktreeDir: ~/.worktrees
+port: 3456
+defaults:
+  runtime: tmux
+  agent: claude-code
+  workspace: worktree
+  notifiers:
+    - desktop
+projects:
+  pinescript-ai:
+    repo: burningportra/pinescript-ai
+    path: /Volumes/1tb/Projects/pinescript-ai
+    defaultBranch: main
+    agentConfig:
+      permissions: skip
+    agentRules: |
+      You are implementing a task for the PineScript AI project (Next.js 16, TypeScript strict, Tailwind CSS v4, no shadcn).
+
+      CRITICAL: Read the GitHub issue assigned to you: `gh issue view <N>`
+
+      SCOPE RULES (STRICTLY ENFORCED):
+      1. ONLY edit files explicitly listed in the issue under "File:" or "Files:"
+      2. ONLY implement changes described in the issue body
+      3. Do NOT add features, files, or changes not mentioned in the issue
+      4. Do NOT add new devDependencies unless the issue explicitly asks for it
+      5. Do NOT touch package.json or package-lock.json unless the issue explicitly asks for it
+      6. If the issue says "Add X to file Y" — add X to file Y. Nothing else.
+
+      ANY change beyond the issue scope will cause the PR to be REJECTED.
+
+      STYLE: No shadcn, no new UI library dependencies. All components built with Tailwind directly.
+      TESTING: Run `npm run build` after changes to verify no type errors.
+      COMMITS: Conventional commits (feat:, fix:). One commit per logical change.
+      PR: Open a PR against origin/main (burningportra/pinescript-ai, NOT upstream). Include "Closes #<N>" in the body. Title format: "feat(<scope>): <description>"
+      Use: gh pr create --repo burningportra/pinescript-ai --base main

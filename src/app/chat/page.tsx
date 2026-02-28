@@ -35,6 +35,7 @@ const ACTION_BUTTONS = [
 export default function ChatPage() {
   const [hasSettings, setHasSettings] = useState<boolean | null>(null);
   const [pineVersion, setPineVersion] = useState<PineVersion>("v6");
+  const [uploadContext, setUploadContext] = useState<{ filename: string } | null>(null);
 
   const {
     messages,
@@ -66,6 +67,23 @@ export default function ChatPage() {
   const handleNewChat = useCallback(() => {
     clearChat();
   }, [clearChat]);
+
+  const handleUpload = useCallback((code: string, filename: string) => {
+    updateCode(code);
+    setUploadContext({ filename });
+  }, [updateCode]);
+
+  const handleSend = useCallback((message: string) => {
+    sendMessage(message);
+    // Clear upload context after sending
+    if (uploadContext) {
+      setUploadContext(null);
+    }
+  }, [sendMessage, uploadContext]);
+
+  const handleDismissUpload = useCallback(() => {
+    setUploadContext(null);
+  }, []);
 
   const checkSettings = useCallback(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -130,7 +148,7 @@ export default function ChatPage() {
                     <button
                       key={btn.label}
                       disabled={isStreaming}
-                      onClick={() => sendMessage(btn.prompt)}
+                      onClick={() => handleSend(btn.prompt)}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-surface text-text-dim hover:border-border-subtle hover:text-text-secondary text-sm transition-colors"
                     >
                       <btn.icon size={16} />
@@ -139,7 +157,13 @@ export default function ChatPage() {
                   ))}
                 </div>
 
-                <ChatInput onSend={sendMessage} disabled={isStreaming} />
+                <ChatInput 
+                  onSend={handleSend} 
+                  onUpload={handleUpload}
+                  uploadContext={uploadContext}
+                  onDismissUpload={handleDismissUpload}
+                  disabled={isStreaming} 
+                />
               </div>
             </div>
           ) : (
@@ -158,7 +182,10 @@ export default function ChatPage() {
 
               {/* Input */}
               <ChatInput
-                onSend={sendMessage}
+                onSend={handleSend}
+                onUpload={handleUpload}
+                uploadContext={uploadContext}
+                onDismissUpload={handleDismissUpload}
                 disabled={isStreaming}
                 placeholder={hasCode ? "Ask for modifications..." : undefined}
               />

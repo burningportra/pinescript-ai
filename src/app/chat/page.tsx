@@ -48,12 +48,15 @@ export default function ChatPage() {
     error,
     validationResults,
     correctedCode,
+    libraryFile,
     sendMessage,
     fixCode,
     loadChat,
     clearChat,
     clearCode,
     updateCode,
+    setLibrary,
+    clearLibrary,
   } = useChat();
 
   const hasCode = currentCode.length > 0;
@@ -91,6 +94,16 @@ export default function ChatPage() {
     updateCode(code);
     // Note: This doesn't create a new version, just restores the code
   }, [updateCode]);
+
+  const handleAttachLibrary = useCallback((code: string, name: string) => {
+    setLibrary(name, code);
+    // TODO: Update active session in localStorage when sessions are implemented
+  }, [setLibrary]);
+
+  const handleDetachLibrary = useCallback(() => {
+    clearLibrary();
+    // TODO: Update active session in localStorage when sessions are implemented
+  }, [clearLibrary]);
 
   const checkSettings = useCallback(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -242,6 +255,9 @@ export default function ChatPage() {
               onFix={fixCode}
               versions={currentVersions}
               onRestoreVersion={handleRestoreVersion}
+              libraryFile={libraryFile}
+              onAttachLibrary={handleAttachLibrary}
+              onDetachLibrary={handleDetachLibrary}
             />
           </div>
         )}

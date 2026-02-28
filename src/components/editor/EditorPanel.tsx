@@ -5,7 +5,7 @@ import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching, foldGutter } from "@codemirror/language";
-import { Copy, Check, Save, Download, Trash2, History, ChevronDown } from "lucide-react";
+import { Copy, Check, Save, Download, Trash2, History, ChevronDown, Library, X } from "lucide-react";
 import { pineScriptLanguage } from "./pine-language";
 import { pineTheme, pineHighlight } from "./codemirror-theme";
 import ValidationPanel from "./ValidationPanel";
@@ -24,6 +24,9 @@ interface EditorPanelProps {
   onFix?: () => void;
   versions?: ScriptVersion[];
   onRestoreVersion?: (code: string, version: number) => void;
+  libraryFile?: { name: string; code: string } | null;
+  onAttachLibrary?: (code: string, name: string) => void;
+  onDetachLibrary?: () => void;
 }
 
 export default function EditorPanel({
@@ -38,6 +41,9 @@ export default function EditorPanel({
   onFix,
   versions = [],
   onRestoreVersion,
+  libraryFile = null,
+  onAttachLibrary,
+  onDetachLibrary,
 }: EditorPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -45,6 +51,7 @@ export default function EditorPanel({
   const [saved, setSaved] = useState(false);
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
 
   const onCodeChangeRef = useRef(onCodeChange);
   onCodeChangeRef.current = onCodeChange;
@@ -71,6 +78,27 @@ export default function EditorPanel({
     onRestoreVersion?.(version.code, version.version);
     setShowVersionDropdown(false);
   }, [onRestoreVersion]);
+
+  const handleLibraryFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onAttachLibrary) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const code = reader.result as string;
+      onAttachLibrary(code, file.name);
+    };
+    reader.readAsText(file);
+    
+    // Reset input value to allow re-selecting the same file
+    if (libraryInputRef.current) {
+      libraryInputRef.current.value = '';
+    }
+  }, [onAttachLibrary]);
+
+  const openLibraryDialog = useCallback(() => {
+    libraryInputRef.current?.click();
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -219,6 +247,31 @@ export default function EditorPanel({
               )}
             </div>
           )}
+
+          {/* Library attachment */}
+          <div className="flex items-center gap-2">
+            {libraryFile ? (
+              <div className="flex items-center gap-1 bg-background border border-border rounded-md px-2 py-1 text-xs text-text-secondary">
+                <Library size={12} />
+                <span>lib: {libraryFile.name}</span>
+                <button
+                  onClick={onDetachLibrary}
+                  className="text-text-dim hover:text-text-secondary transition-colors"
+                  title="Detach library"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={openLibraryDialog}
+                className="w-8 h-8 flex items-center justify-center rounded-md text-text-dim hover:text-text-secondary hover:bg-surface-elevated transition-colors"
+                title="Attach library file"
+              >
+                <Library size={14} />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-1">
           <button
@@ -262,6 +315,15 @@ export default function EditorPanel({
 
       {/* CodeMirror container */}
       <div ref={containerRef} className="flex-1 overflow-auto" />
+
+      {/* Hidden library file input */}
+      <input
+        ref={libraryInputRef}
+        type="file"
+        accept=".pine,.txt"
+        onChange={handleLibraryFileSelect}
+        className="hidden"
+      />
 
       {/* Validation panel */}
       <ValidationPanel

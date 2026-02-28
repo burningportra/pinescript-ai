@@ -1,5 +1,17 @@
 FROM node:20-alpine AS base
 
+# --- Dev stage ---
+FROM base AS dev
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Source is bind-mounted at runtime; just expose the port and run dev server
+EXPOSE 3000
+ENV HOSTNAME="0.0.0.0"
+CMD ["npm", "run", "dev"]
+
 # --- Build stage ---
 FROM base AS builder
 WORKDIR /app

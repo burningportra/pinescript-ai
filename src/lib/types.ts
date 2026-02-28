@@ -93,3 +93,24 @@ export interface ReviewIssue {
   description: string;
   fix: string;
 }
+
+export interface ScriptVersion {
+  version: number; // 1, 2, 3...
+  code: string;
+  timestamp: number;
+  messageId?: string; // assistant message that produced this version
+}
+
+export interface ScriptSession {
+  id: string;
+  title: string; // from indicator/strategy() declaration
+  originalFilename: string;
+  currentCode: string;
+  versions: ScriptVersion[];
+  libraryFile?: { name: string; code: string };
+  chatId: string; // linked SavedChat id
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const SESSIONS_KEY = "pinescript-ai-sessions";

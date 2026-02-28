@@ -49,6 +49,7 @@ export interface ChatState {
   error: string | null;
   validationResults: ValidationResult[];
   correctedCode: string | null;
+  libraryFile: { name: string; code: string } | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

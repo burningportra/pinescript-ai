@@ -17,10 +17,12 @@ interface ChatRequestBody {
   };
   pineVersion?: "v5" | "v6";
   currentCode?: string;
+  libraryCode?: string;
+  libraryFilename?: string;
   test?: boolean;
 }
 
-function buildSystemPrompt(pineVersion: string, currentCode?: string, ragContext?: string): string {
+function buildSystemPrompt(pineVersion: string, currentCode?: string, ragContext?: string, libraryCode?: string, libraryFilename?: string): string {
   const version = pineVersion === "v5" ? "5" : "6";
 
   let prompt = `You are PineScript AI, an expert TradingView Pine Script developer. You generate production-ready Pine Script v${version} code.
@@ -63,6 +65,18 @@ The user has the following code in their editor. When they ask for modifications
 
 \`\`\`pinescript
 ${currentCode}
+\`\`\``;
+  }
+
+  if (libraryCode && libraryFilename) {
+    prompt += `
+
+## Library File Context
+The strategy imports from \`${libraryFilename}\`.
+When modifying the strategy, maintain all import references:
+
+\`\`\`pinescript
+${libraryCode}
 \`\`\``;
   }
 
@@ -164,7 +178,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { messages, settings, pineVersion = "v6", currentCode, test } = body;
+  const { messages, settings, pineVersion = "v6", currentCode, libraryCode, libraryFilename, test } = body;
 
   if (!messages?.length || !settings) {
     return Response.json({ error: "Missing messages or settings" }, { status: 400 });
@@ -235,7 +249,7 @@ export async function POST(req: NextRequest) {
   // Build RAG context from the last user message
   const lastUserMessage = messages[messages.length - 1]?.content || "";
   const ragContext = buildRAGContext(lastUserMessage);
-  const systemPrompt = buildSystemPrompt(pineVersion, currentCode, ragContext);
+  const systemPrompt = buildSystemPrompt(pineVersion, currentCode, ragContext, libraryCode, libraryFilename);
 
   const encoder = new TextEncoder();
   const signal = req.signal;

@@ -14,6 +14,8 @@ type Action =
   | { type: "SET_VALIDATION"; results: ValidationResult[]; correctedCode: string | null }
   | { type: "CLEAR_ERROR" }
   | { type: "LOAD_CHAT"; messages: Message[]; currentCode: string; codeTitle: string }
+  | { type: "SET_LIBRARY"; name: string; code: string }
+  | { type: "CLEAR_LIBRARY" }
   | { type: "RESET" };
 
 const initialState: ChatState = {
@@ -25,6 +27,7 @@ const initialState: ChatState = {
   error: null,
   validationResults: [],
   correctedCode: null,
+  libraryFile: null,
 };
 
 function reducer(state: ChatState, action: Action): ChatState {
@@ -63,6 +66,16 @@ function reducer(state: ChatState, action: Action): ChatState {
         messages: action.messages,
         currentCode: action.currentCode,
         codeTitle: action.codeTitle,
+      };
+    case "SET_LIBRARY":
+      return {
+        ...state,
+        libraryFile: { name: action.name, code: action.code },
+      };
+    case "CLEAR_LIBRARY":
+      return {
+        ...state,
+        libraryFile: null,
       };
     case "RESET":
       return initialState;
@@ -186,6 +199,8 @@ export function useChat() {
           },
           pineVersion: settings.pineVersion,
           currentCode: state.currentCode || undefined,
+          libraryCode: state.libraryFile?.code || undefined,
+          libraryFilename: state.libraryFile?.name || undefined,
         }),
         signal: controller.signal,
       });
@@ -387,6 +402,14 @@ export function useChat() {
     dispatch({ type: "SET_CODE", code, title: state.codeTitle });
   }, [state.codeTitle]);
 
+  const setLibrary = useCallback((name: string, code: string) => {
+    dispatch({ type: "SET_LIBRARY", name, code });
+  }, []);
+
+  const clearLibrary = useCallback(() => {
+    dispatch({ type: "CLEAR_LIBRARY" });
+  }, []);
+
   return {
     ...state,
     sendMessage,
@@ -395,5 +418,7 @@ export function useChat() {
     clearChat,
     clearCode,
     updateCode,
+    setLibrary,
+    clearLibrary,
   };
 }
